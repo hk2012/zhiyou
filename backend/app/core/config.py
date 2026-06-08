@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         description="OpenAI API Key。只放在本机 .env 或环境变量里，不提交到代码仓库。",
     )
     openai_model: str = Field(
-        default="gpt-5.4-mini",
+        default="gpt-5-mini",
         description="AI 垂钓分析使用的 OpenAI 模型，可用 OPENAI_MODEL 覆盖。",
     )
 
