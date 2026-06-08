@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="江湖钓客 — 山水之间，智钓未来">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="江湖钓客">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>江湖钓客</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #F7F1E5;
+      overflow: hidden;
+    }
+    /* 确保 Flutter canvas 能正确接收鼠标/触摸事件 */
+    flt-glass-pane {
+      pointer-events: all !important;
+    }
+    /* 加载中的占位背景，避免白屏 */
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #F7F1E5;
+      font-family: sans-serif;
+      color: #062F32;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <span>江湖钓客 · 加载中…</span>
+  </div>
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // 当 Flutter 启动后隐藏加载占位
+    window.addEventListener('flutter-first-frame', function() {
+      var loading = document.getElementById('loading');
+      if (loading) {
+        loading.style.opacity = '0';
+        loading.style.transition = 'opacity 0.4s ease';
+        setTimeout(function() { loading.remove(); }, 400);
+      }
+    });
+  </script>
+</body>
+</html>
+

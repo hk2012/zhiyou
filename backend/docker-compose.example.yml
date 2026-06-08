@@ -1,0 +1,12 @@
+services:
+  zhiyou-api:
+    build: .
+    container_name: zhiyou-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+
+    # 1Panel 已经安装 PostgreSQL/Redis 时，可以直接把 .env 指向宿主机或容器网络。
+    # 后面如果我们想把数据库也纳入 compose，再追加 postgres/redis 服务。
