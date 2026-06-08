@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     )
     postgres_dsn: Optional[str] = None
     redis_url: Optional[str] = None
+    openai_api_key: Optional[str] = Field(
+        default=None,
+        description="OpenAI API Key。只放在本机 .env 或环境变量里，不提交到代码仓库。",
+    )
+    openai_model: str = Field(
+        default="gpt-5.4-mini",
+        description="AI 垂钓分析使用的 OpenAI 模型，可用 OPENAI_MODEL 覆盖。",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

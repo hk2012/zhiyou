@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
+import '../data/home_recommendation_models.dart';
+import '../data/home_recommendation_repository.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -2523,21 +2525,24 @@ void _showFieldTuneSheet(BuildContext context, _FishingMockScenario scenario) {
   );
 }
 
-class _FieldTuneSheet extends StatefulWidget {
+class _FieldTuneSheet extends ConsumerStatefulWidget {
   const _FieldTuneSheet({required this.scenario});
 
   final _FishingMockScenario scenario;
 
   @override
-  State<_FieldTuneSheet> createState() => _FieldTuneSheetState();
+  ConsumerState<_FieldTuneSheet> createState() => _FieldTuneSheetState();
 }
 
-class _FieldTuneSheetState extends State<_FieldTuneSheet> {
+class _FieldTuneSheetState extends ConsumerState<_FieldTuneSheet> {
   late int _waterIndex;
   late int _windIndex;
   late int _crowdIndex;
   late int _layerIndex;
   bool _recalculating = true;
+  bool _aiLoading = false;
+  FishingAiAnalysis? _aiAnalysis;
+  String? _aiError;
   int _calculationRun = 0;
 
   @override
@@ -2553,11 +2558,67 @@ class _FieldTuneSheetState extends State<_FieldTuneSheet> {
 
   void _scheduleRecalculation(Duration delay) {
     final run = ++_calculationRun;
-    setState(() => _recalculating = true);
+    setState(() {
+      _recalculating = true;
+      _aiLoading = false;
+      _aiAnalysis = null;
+      _aiError = null;
+    });
     Future<void>.delayed(delay, () {
       if (!mounted || run != _calculationRun) return;
       setState(() => _recalculating = false);
+      _requestAiAnalysis(run);
     });
+  }
+
+  Future<void> _requestAiAnalysis(int run) async {
+    final result = _result;
+    final observations = _selectedAiObservations;
+    setState(() => _aiLoading = true);
+    try {
+      final analysis = await ref
+          .read(homeRecommendationRepositoryProvider)
+          .analyzeFishing(
+            locationName: widget.scenario.location,
+            target: widget.scenario.target,
+            weather: widget.scenario.weather,
+            waterTemperature: widget.scenario.waterTemp,
+            depth: widget.scenario.depth,
+            bestTime: widget.scenario.bestTime,
+            spotHint: widget.scenario.spotHint,
+            gear: widget.scenario.gearShort,
+            baselineScore: widget.scenario.score,
+            adjustedScore: result.score,
+            localHeadline: result.headline,
+            localStrategy: '${result.stance}；${result.layer}；${result.pace}',
+            observations: observations,
+          );
+      if (!mounted || run != _calculationRun) return;
+      setState(() {
+        _aiAnalysis = analysis;
+        _aiError = null;
+        _aiLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || run != _calculationRun) return;
+      setState(() {
+        _aiError = '本机 AI 后台暂不可用，已保留本地二次分析。';
+        _aiLoading = false;
+      });
+    }
+  }
+
+  List<Map<String, String>> get _selectedAiObservations {
+    final water = _waterTuneOptions[_waterIndex];
+    final wind = _windTuneOptions[_windIndex];
+    final crowd = _crowdTuneOptions[_crowdIndex];
+    final layer = _layerTuneOptions[_layerIndex];
+    return [
+      {'label': '水色', 'value': water.label, 'effect': water.effect},
+      {'label': '风口', 'value': wind.label, 'effect': wind.effect},
+      {'label': '人流', 'value': crowd.label, 'effect': crowd.effect},
+      {'label': '鱼层反馈', 'value': layer.label, 'effect': layer.effect},
+    ];
   }
 
   void _selectWater(int index) {
@@ -2736,6 +2797,9 @@ class _FieldTuneSheetState extends State<_FieldTuneSheet> {
                         _TuneResultPanel(
                           result: result,
                           recalculating: _recalculating,
+                          aiLoading: _aiLoading,
+                          aiAnalysis: _aiAnalysis,
+                          aiError: _aiError,
                         ),
                       ],
                     ),
@@ -3156,10 +3220,19 @@ class _TuneChoicePill extends StatelessWidget {
 }
 
 class _TuneResultPanel extends StatelessWidget {
-  const _TuneResultPanel({required this.result, required this.recalculating});
+  const _TuneResultPanel({
+    required this.result,
+    required this.recalculating,
+    required this.aiLoading,
+    required this.aiAnalysis,
+    required this.aiError,
+  });
 
   final _TuneResult result;
   final bool recalculating;
+  final bool aiLoading;
+  final FishingAiAnalysis? aiAnalysis;
+  final String? aiError;
 
   @override
   Widget build(BuildContext context) {
@@ -3169,7 +3242,13 @@ class _TuneResultPanel extends StatelessWidget {
       switchOutCurve: Curves.easeOutCubic,
       child: recalculating
           ? _TuneLoadingCard(key: const ValueKey('tune-loading'))
-          : _TuneReadyCard(key: const ValueKey('tune-ready'), result: result),
+          : _TuneReadyCard(
+              key: const ValueKey('tune-ready'),
+              result: result,
+              aiLoading: aiLoading,
+              aiAnalysis: aiAnalysis,
+              aiError: aiError,
+            ),
     );
   }
 }
@@ -3234,9 +3313,18 @@ class _TuneLoadingCard extends StatelessWidget {
 }
 
 class _TuneReadyCard extends StatelessWidget {
-  const _TuneReadyCard({super.key, required this.result});
+  const _TuneReadyCard({
+    super.key,
+    required this.result,
+    required this.aiLoading,
+    required this.aiAnalysis,
+    required this.aiError,
+  });
 
   final _TuneResult result;
+  final bool aiLoading;
+  final FishingAiAnalysis? aiAnalysis;
+  final String? aiError;
 
   @override
   Widget build(BuildContext context) {
@@ -3370,6 +3458,223 @@ class _TuneReadyCard extends StatelessWidget {
                 ),
             ],
           ),
+          SizedBox(height: 12.h),
+          _AiAnalysisCard(
+            loading: aiLoading,
+            analysis: aiAnalysis,
+            error: aiError,
+            color: result.color,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiAnalysisCard extends StatelessWidget {
+  const _AiAnalysisCard({
+    required this.loading,
+    required this.analysis,
+    required this.error,
+    required this.color,
+  });
+
+  final bool loading;
+  final FishingAiAnalysis? analysis;
+  final String? error;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return _AiStatusBox(
+        icon: Icons.auto_awesome_rounded,
+        title: '正在连接本机 AI 后台',
+        subtitle: '用 ChatGPT 模型生成垂钓分析...',
+        color: color,
+        trailing: const InkTaijiLoader(size: 22, label: ''),
+      );
+    }
+
+    if (error != null) {
+      return _AiStatusBox(
+        icon: Icons.cloud_off_rounded,
+        title: 'AI 后台未返回',
+        subtitle: error!,
+        color: InkPalette.cinnabar,
+      );
+    }
+
+    final item = analysis;
+    if (item == null) {
+      return _AiStatusBox(
+        icon: Icons.auto_awesome_rounded,
+        title: 'AI 分析待生成',
+        subtitle: '本地重算完成后会自动请求这台 Mac 的后台服务。',
+        color: color,
+      );
+    }
+
+    final statusColor = item.fromOpenAi ? InkPalette.pine : InkPalette.reed;
+    return InkCard(
+      padding: EdgeInsets.all(12.r),
+      color: statusColor.withValues(alpha: item.fromOpenAi ? 0.10 : 0.12),
+      borderColor: statusColor.withValues(alpha: 0.20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              InkIconMark(
+                icon: item.fromOpenAi
+                    ? Icons.auto_awesome_rounded
+                    : Icons.psychology_alt_rounded,
+                color: statusColor,
+                size: 36,
+                iconSize: 18,
+              ),
+              SizedBox(width: 9.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.fromOpenAi ? 'ChatGPT 垂钓分析' : '本机规则兜底',
+                      style: TextStyle(
+                        color: InkPalette.text,
+                        fontSize: 13.5.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      '${item.model} · 置信 ${item.confidence}%',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.muted,
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              InkChip(
+                label: item.fromOpenAi ? 'AI' : '本地',
+                active: true,
+                color: statusColor,
+              ),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          Text(
+            item.headline,
+            style: TextStyle(
+              color: InkPalette.text,
+              fontSize: 13.sp,
+              height: 1.35,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            item.summary,
+            style: TextStyle(
+              color: InkPalette.muted,
+              fontSize: 11.5.sp,
+              height: 1.4,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 10.h),
+          _TuneResultLine(
+            icon: Icons.place_rounded,
+            label: 'AI站位',
+            value: item.spotStrategy,
+            color: InkPalette.pine,
+          ),
+          SizedBox(height: 7.h),
+          _TuneResultLine(
+            icon: Icons.set_meal_rounded,
+            label: 'AI饵法',
+            value: item.baitStrategy,
+            color: InkPalette.reed,
+          ),
+          SizedBox(height: 7.h),
+          _TuneResultLine(
+            icon: Icons.flag_rounded,
+            label: 'AI止损',
+            value: item.stopLoss,
+            color: InkPalette.cinnabar,
+          ),
+          SizedBox(height: 9.h),
+          Text(
+            item.safetyNote,
+            style: TextStyle(
+              color: InkPalette.cinnabar,
+              fontSize: 11.sp,
+              height: 1.35,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiStatusBox extends StatelessWidget {
+  const _AiStatusBox({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkCard(
+      padding: EdgeInsets.all(11.r),
+      color: color.withValues(alpha: 0.08),
+      borderColor: color.withValues(alpha: 0.18),
+      child: Row(
+        children: [
+          InkIconMark(icon: icon, color: color, size: 34, iconSize: 17),
+          SizedBox(width: 9.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: InkPalette.text,
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: InkPalette.muted,
+                    fontSize: 11.sp,
+                    height: 1.35,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[SizedBox(width: 8.w), trailing!],
         ],
       ),
     );
@@ -3397,7 +3702,7 @@ class _TuneResultLine extends StatelessWidget {
         Icon(icon, color: color, size: 16.w),
         SizedBox(width: 7.w),
         SizedBox(
-          width: 38.w,
+          width: 46.w,
           child: Text(
             label,
             style: TextStyle(

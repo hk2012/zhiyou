@@ -86,6 +86,42 @@ class HomeRecommendationRepository {
     return HomeRecommendationSummary.fromJson(response.data ?? {});
   }
 
+  Future<FishingAiAnalysis> analyzeFishing({
+    required String locationName,
+    required String target,
+    required String weather,
+    required String waterTemperature,
+    required String depth,
+    required String bestTime,
+    required String spotHint,
+    required String gear,
+    required int baselineScore,
+    required int adjustedScore,
+    required String localHeadline,
+    required String localStrategy,
+    required List<Map<String, String>> observations,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/ai/fishing-analysis',
+      data: {
+        'location_name': locationName,
+        'target': target,
+        'weather': weather,
+        'water_temperature': waterTemperature,
+        'depth': depth,
+        'best_time': bestTime,
+        'spot_hint': spotHint,
+        'gear': gear,
+        'baseline_score': baselineScore,
+        'adjusted_score': adjustedScore,
+        'local_headline': localHeadline,
+        'local_strategy': localStrategy,
+        'observations': observations,
+      },
+    );
+    return FishingAiAnalysis.fromJson(response.data ?? {});
+  }
+
   Future<CatchRecordResult> recordCatch({
     required HomeLocation location,
     required String fish,

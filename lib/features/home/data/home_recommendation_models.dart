@@ -37,6 +37,61 @@ class HomeExpertObservation {
   }
 }
 
+class FishingAiAnalysis {
+  const FishingAiAnalysis({
+    required this.source,
+    required this.model,
+    required this.providerStatus,
+    required this.headline,
+    required this.summary,
+    required this.confidence,
+    required this.bestWindow,
+    required this.spotStrategy,
+    required this.baitStrategy,
+    required this.paceStrategy,
+    required this.stopLoss,
+    required this.safetyNote,
+    required this.followUpQuestion,
+    required this.reasons,
+  });
+
+  final String source;
+  final String model;
+  final String providerStatus;
+  final String headline;
+  final String summary;
+  final int confidence;
+  final String bestWindow;
+  final String spotStrategy;
+  final String baitStrategy;
+  final String paceStrategy;
+  final String stopLoss;
+  final String safetyNote;
+  final String followUpQuestion;
+  final List<String> reasons;
+
+  bool get fromOpenAi => source == 'openai' && providerStatus == 'ok';
+
+  factory FishingAiAnalysis.fromJson(Map<String, dynamic> json) {
+    return FishingAiAnalysis(
+      source: json['source']?.toString() ?? 'local_rule',
+      model: json['model']?.toString() ?? '',
+      providerStatus: json['provider_status']?.toString() ?? '',
+      headline: json['headline']?.toString() ?? '',
+      summary: json['summary']?.toString() ?? '',
+      confidence: _asInt(json['confidence']) ?? 0,
+      bestWindow: json['best_window']?.toString() ?? '',
+      spotStrategy: json['spot_strategy']?.toString() ?? '',
+      baitStrategy: json['bait_strategy']?.toString() ?? '',
+      paceStrategy: json['pace_strategy']?.toString() ?? '',
+      stopLoss: json['stop_loss']?.toString() ?? '',
+      safetyNote: json['safety_note']?.toString() ?? '',
+      followUpQuestion: json['follow_up_question']?.toString() ?? '',
+      reasons: _asStringList(json['reasons']),
+    );
+  }
+}
+
 class HomeRecommendationSummary {
   const HomeRecommendationSummary({
     required this.recommendationId,

@@ -126,9 +126,26 @@ build_args=(ios --release --dart-define="API_BASE_URL=$API_BASE_URL")
 echo "==> 开始构建 iOS 真机 release 包"
 flutter build "${build_args[@]}"
 
+APP_BUNDLE="$PROJECT_ROOT/build/ios/iphoneos/Runner.app"
+if [[ ! -d "$APP_BUNDLE" ]]; then
+  APP_BUNDLE="$PROJECT_ROOT/build/ios/Release-iphoneos/Runner.app"
+fi
+
+if [[ ! -d "$APP_BUNDLE" ]]; then
+  echo "错误：没有找到 iOS App Bundle，实际产物如下：" >&2
+  find "$PROJECT_ROOT/build/ios" -maxdepth 4 -name "*.app" -type d -print >&2 || true
+  exit 1
+fi
+
+echo "==> App Bundle: $APP_BUNDLE"
+
 for device_id in "${online_device_ids[@]}"; do
   echo "==> 安装到真机: $device_id"
-  flutter install -d "$device_id" --release
+  if xcrun devicectl --version >/dev/null 2>&1; then
+    xcrun devicectl device install app --device "$device_id" "$APP_BUNDLE"
+  else
+    flutter install -d "$device_id" --release
+  fi
 done
 
 echo "==> 安装完成，可在 iPhone 上打开「江湖钓客」。"
