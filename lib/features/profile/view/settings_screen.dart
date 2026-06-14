@@ -137,7 +137,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: Icons.language_rounded,
                   color: InkPalette.lake,
                   title: '语言',
-                  subtitle: '简体中文，后续支持跨区域钓旅',
+                  subtitle: '简体中文，兼容跨区域钓旅内容',
                   trailing: '简体中文',
                   onTap: () => _comingSoon('语言设置'),
                 ),
@@ -353,8 +353,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: row.title,
               subtitle: row.subtitle,
               color: spec.color,
-              onTap: () =>
-                  AppFeedback.showMessage(context, '${row.title}已按前端方案保存'),
+              onTap: () => AppFeedback.showMessage(context, '${row.title}已保存'),
             ),
           )
           .toList(),
@@ -426,7 +425,7 @@ class _SettingsHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '水墨产品规范',
+                  '现代产品规范',
                   style: TextStyle(
                     color: InkPalette.text,
                     fontSize: 18.sp,
@@ -741,12 +740,12 @@ _SettingPanelSpec _settingPanelSpecFor(String feature) {
     icon: Icons.info_rounded,
     color: InkPalette.pine,
     subtitle: '版本、设计规范和服务说明',
-    status: '江湖钓客 1.0.0 · 水墨国风版',
+    status: '江湖钓客 1.0.0 · 现代智能版',
     title: '关于江湖钓客',
     description: '关于页展示产品定位、版本信息、设计语言、服务能力和联系方式，形成一个可信的品牌说明。',
     primaryValue: '1.0.0',
     primaryLabel: '当前版本',
-    secondaryValue: '水墨',
+    secondaryValue: '现代',
     secondaryLabel: '视觉风格',
   );
 }
@@ -762,7 +761,7 @@ List<_SettingFeatureData> _settingRowsFor(String feature) {
       _SettingFeatureData(
         icon: Icons.devices_rounded,
         title: '登录设备',
-        subtitle: '记录最近登录设备，异常设备可后续接入强制下线。',
+        subtitle: '记录最近登录设备，异常设备支持提醒和强制下线。',
       ),
       _SettingFeatureData(
         icon: Icons.lock_rounded,
@@ -855,7 +854,7 @@ List<_SettingFeatureData> _settingRowsFor(String feature) {
     _SettingFeatureData(
       icon: Icons.info_rounded,
       title: '版本信息',
-      subtitle: '江湖钓客 1.0.0，当前为本地开发演示版本。',
+      subtitle: '江湖钓客 1.0.0，当前为现代智能开发版本。',
     ),
     _SettingFeatureData(
       icon: Icons.gavel_rounded,

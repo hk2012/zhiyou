@@ -121,7 +121,7 @@ class OpenAIFishingAnalyzer:
             bait_strategy=payload.gear or "根据水色在自然色和亮色之间切换",
             pace_strategy=payload.local_strategy or "先快搜找鱼，再缩小落点慢控",
             stop_loss="20 分钟无有效反馈就换层；三层无口直接换点。",
-            safety_note="演示建议不能替代现场安全判断；涨水、雷雨、夜钓要优先撤离或结伴。",
+            safety_note="系统建议不能替代现场安全判断；涨水、雷雨、夜钓要优先撤离或结伴。",
             follow_up_question="到点后能否补充水色、风口、人流和第一轮鱼层反馈？",
             reasons=reasons,
         )

@@ -18,16 +18,16 @@ def test_password_login_returns_api_envelope(client: TestClient) -> None:
 
 # 测试当前用户接口：确保登录后刷新用户资料不再 404。
 def test_current_user_returns_profile(client: TestClient) -> None:
-    """当前用户接口应返回演示用户资料。"""
+    """当前用户接口应返回本地用户资料。"""
     response = client.get("/api/v1/user/me")
 
     assert response.status_code == 200
-    assert response.json()["data"]["nickname"] == "渔趣演示用户"
+    assert response.json()["data"]["nickname"] == "江湖钓客"
 
 
 # 测试用户统计接口：确保个人中心基础统计可用。
 def test_current_user_stats_returns_data(client: TestClient) -> None:
-    """当前用户统计接口应返回演示统计数据。"""
+    """当前用户统计接口应返回本地统计数据。"""
     response = client.get("/api/v1/user/me/stats")
 
     assert response.status_code == 200

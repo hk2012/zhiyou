@@ -6,8 +6,12 @@ import '../features/auth/view/login_screen.dart';
 import '../features/community/view/community_screen.dart';
 import '../features/creation/view/creation_modal_screen.dart';
 import '../features/explore/view/explore_screen.dart';
+import '../features/explore/view/spot_detail_screen.dart';
 import '../features/home/view/home_screen.dart';
 import '../features/main_shell/view/main_shell_screen.dart';
+import '../features/mall/view/mall_cart_screen.dart';
+import '../features/mall/view/mall_checkout_screen.dart';
+import '../features/mall/view/mall_product_detail_screen.dart';
 import '../features/mall/view/mall_screen.dart';
 import '../features/profile/view/profile_screen.dart';
 import '../features/profile/view/settings_screen.dart';
@@ -89,9 +93,9 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRouteNames.community,
+                path: AppRouteNames.mall,
                 pageBuilder: (context, state) =>
-                    _inkPage(state, const CommunityScreen()),
+                    _inkPage(state, const MallScreen()),
               ),
             ],
           ),
@@ -107,17 +111,52 @@ class AppRouter {
         ],
       ),
       GoRoute(
+        path: AppRouteNames.mallCart,
+        name: 'MallCart',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            _inkPage(state, const MallCartScreen()),
+      ),
+      GoRoute(
+        path: AppRouteNames.mallCheckout,
+        name: 'MallCheckout',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            _inkPage(state, const MallCheckoutScreen()),
+      ),
+      GoRoute(
+        path: AppRouteNames.mallProductDetail,
+        name: 'MallProductDetail',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final productId = state.uri.queryParameters['id'] ?? '';
+          return _inkPage(state, MallProductDetailScreen(productId: productId));
+        },
+      ),
+      GoRoute(
+        path: AppRouteNames.spotDetail,
+        name: 'SpotDetail',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final spotName = state.uri.queryParameters['name'] ?? '附近钓点';
+          return _inkPage(state, SpotDetailScreen(spotName: spotName));
+        },
+      ),
+      GoRoute(
         path: AppRouteNames.creationModal,
         name: 'CreationModal',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) =>
-            _modalPage(state, const CreationModalScreen()),
+        pageBuilder: (context, state) {
+          final spotName = state.uri.queryParameters['spot'];
+          return _modalPage(state, CreationModalScreen(initialSpot: spotName));
+        },
       ),
       GoRoute(
-        path: AppRouteNames.mall,
-        name: 'Mall',
+        path: AppRouteNames.community,
+        name: 'Community',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => _inkPage(state, const MallScreen()),
+        pageBuilder: (context, state) =>
+            _inkPage(state, const CommunityScreen()),
       ),
       GoRoute(
         path: AppRouteNames.settings,

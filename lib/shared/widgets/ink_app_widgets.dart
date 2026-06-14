@@ -5,67 +5,40 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/constants/app_colors.dart';
+
 class InkPalette {
   InkPalette._();
 
-  static const ink = Color(0xFF062F32);
-  static const pine = Color(0xFF0E3A3A);
-  static const lake = Color(0xFF1F5A5A);
-  static const moss = Color(0xFF40746E);
-  static const reed = Color(0xFFD6B46D);
-  static const cinnabar = Color(0xFFCB5A3E);
-  static const rice = Color(0xFFF7F1E5);
-  static const paper = Color(0xFFF1E7D2);
-  static const mist = Color(0xFFE6EEE8);
-  static const line = Color(0xFFC7C1B1);
-  static const text = Color(0xFF16312F);
-  static const muted = Color(0xFF425B56);
-  static const faint = Color(0xFF677B76);
-  static const white = Color(0xFFFFFFFF);
+  static const ink = AppColors.textPrimary;
+  static const pine = AppColors.brand;
+  static const lake = AppColors.info;
+  static const moss = AppColors.success;
+  static const reed = AppColors.commerce;
+  static const cinnabar = AppColors.danger;
+  static const rice = AppColors.surface;
+  static const paper = AppColors.surfaceMuted;
+  static const mist = AppColors.deviceSoft;
+  static const line = AppColors.border;
+  static const text = AppColors.textPrimary;
+  static const muted = AppColors.textSecondary;
+  static const faint = AppColors.textDisabled;
+  static const white = AppColors.onInverse;
 }
 
 class InkAssets {
   InkAssets._();
 
-  static const ricePaper = 'assets/images/ink_style/rice_paper_bg.png';
   static const homeLakeHero = 'assets/images/ink_style/home_lake_hero.png';
   static const fishingMap = 'assets/images/ink_style/ink_fishing_map.png';
-  static const bamboo = 'assets/images/ink_style/bamboo_overlay.png';
-  static const badgeFrames = 'assets/images/ink_style/ink_badge_frames.png';
+  static const commercialTiles =
+      'assets/images/app_visuals/commercial_tiles.png';
 }
 
-const List<String> inkFontFallback = [
-  'ZCOOLXiaoWei',
-  'Songti SC',
-  'STSong',
-  'Kaiti SC',
-  'STKaiti',
-  'Source Han Serif SC',
-  'Noto Serif CJK SC',
-  'PingFang SC',
-  'Hiragino Sans GB',
-  'Microsoft YaHei',
-  'Noto Sans CJK SC',
-  'Arial Unicode MS',
-  'sans-serif',
-];
+enum InkVisualTileKind { mall, map, spot, achievement }
 
-const List<String> brushFontFallback = [
-  'MaShanZheng',
-  'STXingkai',
-  'Xingkai SC',
-  'HanziPen SC',
-  'Hannotate SC',
-  'HanziPen TC',
-  'Kaiti SC',
-  'STKaiti',
-  'KaiTi',
-  'FZKai-Z03',
-  'Songti SC',
-  'STSong',
-  'PingFang SC',
-  'serif',
-];
+const List<String> inkFontFallback = AppTypography.fontFallback;
+const List<String> brushFontFallback = AppTypography.fontFallback;
 
 class InkBrand extends StatelessWidget {
   const InkBrand({
@@ -81,7 +54,7 @@ class InkBrand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleSize = compact ? 28.sp : 42.sp;
+    final titleSize = compact ? 23.sp : 34.sp;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -91,52 +64,44 @@ class InkBrand extends StatelessWidget {
             color: color,
             fontSize: titleSize,
             height: 1,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0,
-            fontFamily: 'MaShanZheng',
             fontFamilyFallback: brushFontFallback,
-            shadows: [
-              Shadow(
-                color: InkPalette.ink.withValues(alpha: 0.18),
-                blurRadius: 0,
-                offset: Offset(1.w, 1.h),
-              ),
-            ],
           ),
         ),
-        SizedBox(height: compact ? 5.h : 10.h),
-        Container(
-          height: compact ? 5.h : 7.h,
-          width: compact ? 82.w : 126.w,
-          decoration: BoxDecoration(
-            color: subtitleColor.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(999),
-          ),
-        ),
-        SizedBox(height: compact ? 3.h : 7.h),
+        SizedBox(height: compact ? 5.h : 8.h),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(
+              Icons.settings_input_antenna_rounded,
+              size: compact ? 13.w : 15.w,
+              color: subtitleColor,
+            ),
+            SizedBox(width: 5.w),
             Text(
-              '山水之间',
+              '智能设备',
               style: TextStyle(
                 color: subtitleColor,
-                fontSize: compact ? 10.sp : 12.sp,
+                fontSize: compact ? 10.5.sp : 12.sp,
                 fontWeight: FontWeight.w800,
                 fontFamilyFallback: inkFontFallback,
               ),
             ),
             Container(
-              width: 18.w,
-              height: 1,
-              margin: EdgeInsets.symmetric(horizontal: 6.w),
-              color: subtitleColor.withValues(alpha: 0.45),
+              width: 4.w,
+              height: 4.w,
+              margin: EdgeInsets.symmetric(horizontal: 7.w),
+              decoration: BoxDecoration(
+                color: subtitleColor.withValues(alpha: 0.48),
+                shape: BoxShape.circle,
+              ),
             ),
             Text(
-              '静钓未来',
+              'AI 出钓决策',
               style: TextStyle(
                 color: subtitleColor,
-                fontSize: compact ? 10.sp : 12.sp,
+                fontSize: compact ? 10.5.sp : 12.sp,
                 fontWeight: FontWeight.w800,
                 fontFamilyFallback: inkFontFallback,
               ),
@@ -169,7 +134,7 @@ class InkPage extends StatelessWidget {
       extendBody: true,
       body: Stack(
         children: [
-          if (showLandscape) const Positioned.fill(child: InkBackdrop()),
+          const Positioned.fill(child: InkBackdrop()),
           SafeArea(top: !extendBehindStatusBar, bottom: false, child: child),
         ],
       ),
@@ -186,41 +151,60 @@ class InkBackdrop extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: opacity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(decoration: BoxDecoration(color: InkPalette.rice)),
-          Image.asset(
-            InkAssets.ricePaper,
-            fit: BoxFit.cover,
-            alignment: Alignment.topCenter,
-            errorBuilder: (context, error, stackTrace) {
-              return const SizedBox.shrink();
-            },
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: InkPalette.rice,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              InkPalette.white,
+              InkPalette.rice,
+              InkPalette.mist.withValues(alpha: 0.26),
+            ],
           ),
-          CustomPaint(
-            painter: _InkBackdropPainter(),
-            child: const SizedBox.expand(),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Opacity(
-                opacity: 0.10,
-                child: Image.asset(
-                  InkAssets.bamboo,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topRight,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const SizedBox.shrink();
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
+        child: CustomPaint(
+          painter: _ModernBackdropPainter(),
+          child: const SizedBox.expand(),
+        ),
       ),
     );
   }
+}
+
+class _ModernBackdropPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = InkPalette.line.withValues(alpha: 0.30)
+      ..strokeWidth = 1;
+    const step = 48.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final glowPaint = Paint()
+      ..shader =
+          RadialGradient(
+            colors: [
+              InkPalette.lake.withValues(alpha: 0.12),
+              Colors.transparent,
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(size.width * 0.86, size.height * 0.10),
+              radius: size.width * 0.75,
+            ),
+          );
+    canvas.drawRect(Offset.zero & size, glowPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class InkPressable extends StatefulWidget {
@@ -293,7 +277,7 @@ class _InkPressableState extends State<InkPressable>
       },
       child: AnimatedScale(
         scale: _pressed ? widget.pressedScale : 1,
-        duration: const Duration(milliseconds: 110),
+        duration: AppDurations.fast,
         curve: Curves.easeOutCubic,
         child: Stack(
           children: [
@@ -343,27 +327,32 @@ class InkLandscapeHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22.r),
+      borderRadius: BorderRadius.circular(AppRadii.appFrame.r),
       child: SizedBox(
         height: height.h,
         width: double.infinity,
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset(
-                InkAssets.homeLakeHero,
-                fit: BoxFit.cover,
-                alignment: Alignment.centerRight,
-                errorBuilder: (context, error, stackTrace) {
-                  return CustomPaint(
-                    painter: _InkLandscapePainter(bright: bright),
-                  );
-                },
-              ),
-            ),
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _InkWashOverlayPainter(bright: bright),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: bright
+                        ? const [
+                            Color(0xFF0F766E),
+                            Color(0xFF2563EB),
+                            Color(0xFF0F172A),
+                          ]
+                        : const [
+                            Color(0xFF334155),
+                            Color(0xFF0F766E),
+                            Color(0xFF0F172A),
+                          ],
+                  ),
+                ),
+                child: CustomPaint(painter: _ModernHeroPainter()),
               ),
             ),
             Positioned.fill(
@@ -401,7 +390,6 @@ class InkLandscapeHero extends StatelessWidget {
                               fontSize: 28.sp,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0,
-                              fontFamily: 'MaShanZheng',
                               fontFamilyFallback: brushFontFallback,
                               shadows: const [
                                 Shadow(
@@ -448,6 +436,40 @@ class InkLandscapeHero extends StatelessWidget {
   }
 }
 
+class _ModernHeroPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.13)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    for (var i = 0; i < 7; i++) {
+      final y = size.height * (0.15 + i * 0.12);
+      final path = Path()
+        ..moveTo(-20, y)
+        ..cubicTo(
+          size.width * 0.24,
+          y - 28,
+          size.width * 0.52,
+          y + 28,
+          size.width + 20,
+          y - 8,
+        );
+      canvas.drawPath(path, linePaint);
+    }
+
+    final dotPaint = Paint()..color = Colors.white.withValues(alpha: 0.18);
+    for (var i = 0; i < 18; i++) {
+      final x = size.width * ((i * 37 % 100) / 100);
+      final y = size.height * ((i * 29 % 100) / 100);
+      canvas.drawCircle(Offset(x, y), 2.2 + (i % 3), dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class InkTopBar extends StatelessWidget {
   const InkTopBar({
     super.key,
@@ -467,7 +489,12 @@ class InkTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 6.h),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.page.w,
+        AppSpacing.md.h,
+        AppSpacing.page.w,
+        AppSpacing.sm.h,
+      ),
       child: Row(
         children: [
           if (onBack != null) ...[
@@ -490,20 +517,10 @@ class InkTopBar extends StatelessWidget {
                     fontSize: 26.sp,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
-                    fontFamily: 'MaShanZheng',
                     fontFamilyFallback: brushFontFallback,
                   ),
                 ),
-                Container(
-                  height: 5.h,
-                  width: 86.w,
-                  margin: EdgeInsets.only(top: 2.h, bottom: 2.h),
-                  child: CustomPaint(
-                    painter: _InkBrushStrokePainter(
-                      color: InkPalette.pine.withValues(alpha: 0.18),
-                    ),
-                  ),
-                ),
+                SizedBox(height: 4.h),
                 if (subtitle != null)
                   Text(
                     subtitle!,
@@ -553,44 +570,17 @@ class InkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = Container(
       margin: margin,
-      padding: padding ?? EdgeInsets.all(14.r),
+      padding: padding ?? EdgeInsets.all(AppSpacing.xl.r),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: color ?? const Color(0xFFFFFBF2).withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(13.r),
+        color: color ?? InkPalette.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(AppRadii.lg.r),
         border: Border.all(
-          color: borderColor ?? InkPalette.ink.withValues(alpha: 0.22),
+          color: borderColor ?? InkPalette.line.withValues(alpha: 0.92),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: InkPalette.ink.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: Offset(0, 3.h),
-          ),
-        ],
+        boxShadow: [AppShadows.cardShadow],
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -42.w,
-            bottom: -34.h,
-            width: 150.w,
-            height: 112.h,
-            child: Opacity(
-              opacity: color == null ? 0.08 : 0,
-              child: Image.asset(
-                InkAssets.bamboo,
-                fit: BoxFit.cover,
-                alignment: Alignment.bottomRight,
-                errorBuilder: (context, error, stackTrace) {
-                  return CustomPaint(painter: _InkCardCornerPainter());
-                },
-              ),
-            ),
-          ),
-          child,
-        ],
-      ),
+      child: child,
     );
 
     return InkPressable(onTap: onTap, child: card);
@@ -612,13 +602,13 @@ class InkGlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22.r),
+      borderRadius: BorderRadius.circular(AppRadii.sheet.r),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: InkCard(
           padding: padding,
-          color: const Color(0xFFFFFBF2).withValues(alpha: 0.90),
-          borderColor: InkPalette.ink.withValues(alpha: 0.20),
+          color: InkPalette.white.withValues(alpha: 0.92),
+          borderColor: InkPalette.line.withValues(alpha: 0.88),
           onTap: onTap,
           child: child,
         ),
@@ -644,48 +634,36 @@ class InkSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 22.h, 18.w, 10.h),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.page.w,
+        AppSpacing.section.h,
+        AppSpacing.page.w,
+        AppSpacing.md.h,
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned(
-                      left: -5.w,
-                      right: -10.w,
-                      bottom: 1.h,
-                      height: 10.h,
-                      child: CustomPaint(
-                        painter: _InkBrushStrokePainter(
-                          color: InkPalette.pine.withValues(alpha: 0.18),
-                        ),
-                      ),
-                    ),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: InkPalette.text,
-                        fontSize: 22.sp,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
-                        fontFamily: 'MaShanZheng',
-                        fontFamilyFallback: brushFontFallback,
-                      ),
-                    ),
-                  ],
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: InkPalette.text,
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                    fontFamilyFallback: inkFontFallback,
+                  ),
                 ),
-                SizedBox(height: 2.h),
+                SizedBox(height: 4.h),
                 if (subtitle != null)
                   Text(
                     subtitle!,
                     style: TextStyle(
                       color: InkPalette.muted,
-                      fontSize: 12.sp,
+                      fontSize: 12.5.sp,
                       fontWeight: FontWeight.w900,
                       fontFamilyFallback: inkFontFallback,
                     ),
@@ -861,11 +839,15 @@ class InkChip extends StatelessWidget {
     return InkPressable(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        duration: AppDurations.normal,
+        constraints: BoxConstraints(minHeight: 32.h, maxWidth: 136.w),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg.w,
+          vertical: AppSpacing.sm.h,
+        ),
         decoration: BoxDecoration(
           color: active ? color : InkPalette.white.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppRadii.pill.r),
           border: Border.all(
             color: active ? color : InkPalette.line.withValues(alpha: 0.9),
           ),
@@ -874,15 +856,20 @@ class InkChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 15.w, color: active ? InkPalette.white : color),
+              Icon(icon, size: 14.w, color: active ? InkPalette.white : color),
               SizedBox(width: 5.w),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? InkPalette.white : InkPalette.text,
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w900,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: active ? InkPalette.white : InkPalette.text,
+                  fontSize: 11.5.sp,
+                  height: 1.1,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ],
@@ -909,44 +896,49 @@ class InkMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 10.h),
+      constraints: BoxConstraints(minHeight: 66.h),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg.w,
+        vertical: AppSpacing.lg.h,
+      ),
       decoration: BoxDecoration(
-        color: InkPalette.paper.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(14.r),
+        color: InkPalette.paper.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(AppRadii.lg.r),
         border: Border.all(color: InkPalette.line.withValues(alpha: 0.7)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (icon != null) ...[
-            InkIconMark(icon: icon!, color: color, size: 30, iconSize: 16),
-            SizedBox(width: 7.w),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            children: [
+              if (icon != null) ...[
+                InkIconMark(icon: icon!, color: color, size: 26, iconSize: 14),
+                SizedBox(width: 6.w),
+              ],
+              Expanded(
+                child: Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: InkPalette.text,
-                    fontSize: 15.sp,
+                    fontSize: 15.5.sp,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 2.h),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.muted,
-                    fontSize: 11.5.sp,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          SizedBox(height: 5.h),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: InkPalette.muted,
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -976,12 +968,13 @@ class InkPrimaryButton extends StatelessWidget {
     return InkPressable(
       onTap: busy ? null : onTap,
       child: Container(
-        height: 50.h,
+        height: 48.h,
+        padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg.w),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [color, Color.lerp(color, InkPalette.lake, 0.42)!],
           ),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppRadii.pill.r),
           boxShadow: [
             BoxShadow(
               color: color.withValues(alpha: 0.24),
@@ -992,24 +985,86 @@ class InkPrimaryButton extends StatelessWidget {
         ),
         child: Center(
           child: busy
-              ? const InkTaijiLoader(size: 24, label: '')
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (icon != null) ...[
-                      Icon(icon, color: InkPalette.white, size: 18.w),
-                      SizedBox(width: 7.w),
-                    ],
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: InkPalette.white,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w900,
+              ? const InkTaijiLoader(size: 22, label: '')
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, color: InkPalette.white, size: 17.w),
+                        SizedBox(width: 6.w),
+                      ],
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: InkPalette.white,
+                          fontSize: 14.5.sp,
+                          height: 1.15,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+        ),
+      ),
+    );
+  }
+}
+
+class InkSecondaryButton extends StatelessWidget {
+  const InkSecondaryButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.color = InkPalette.pine,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final IconData? icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkPressable(
+      onTap: onTap,
+      child: Container(
+        height: 48.h,
+        padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg.w),
+        decoration: BoxDecoration(
+          color: InkPalette.white.withValues(alpha: 0.78),
+          borderRadius: BorderRadius.circular(AppRadii.pill.r),
+          border: Border.all(color: InkPalette.ink.withValues(alpha: 0.16)),
+        ),
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, color: color, size: 17.w),
+                  SizedBox(width: 6.w),
+                ],
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14.5.sp,
+                    height: 1.15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1068,7 +1123,6 @@ class _InkTaijiLoaderState extends State<InkTaijiLoader>
                   color: InkPalette.white,
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w900,
-                  fontFamily: 'MaShanZheng',
                   fontFamilyFallback: brushFontFallback,
                 ),
               ),
@@ -1435,7 +1489,6 @@ class InkSeal extends StatelessWidget {
           fontSize: 12.sp,
           height: 1.15,
           fontWeight: FontWeight.w900,
-          fontFamily: 'MaShanZheng',
           fontFamilyFallback: brushFontFallback,
         ),
       ),
@@ -1459,33 +1512,23 @@ class InkMiniMap extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset(
-                InkAssets.fishingMap,
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                errorBuilder: (context, error, stackTrace) {
-                  return DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: InkPalette.rice.withValues(alpha: 0.08),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
+                  color: InkPalette.paper,
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [
-                      InkPalette.rice.withValues(alpha: 0.06),
-                      Colors.transparent,
-                      InkPalette.ink.withValues(alpha: 0.08),
+                      InkPalette.white,
+                      InkPalette.mist.withValues(alpha: 0.72),
+                      InkPalette.paper,
                     ],
                   ),
                 ),
               ),
+            ),
+            Positioned.fill(
+              child: CustomPaint(painter: _ModernMapGridPainter()),
             ),
             Positioned.fill(
               child: CustomPaint(
@@ -1497,6 +1540,130 @@ class InkMiniMap extends StatelessWidget {
       ),
     );
   }
+}
+
+class InkCommercialVisual extends StatelessWidget {
+  const InkCommercialVisual({
+    super.key,
+    required this.kind,
+    this.width,
+    this.height,
+    this.radius = 16,
+    this.borderColor,
+  });
+
+  final InkVisualTileKind kind;
+  final double? width;
+  final double? height;
+  final double radius;
+  final Color? borderColor;
+
+  Alignment get _alignment {
+    switch (kind) {
+      case InkVisualTileKind.mall:
+        return Alignment.topLeft;
+      case InkVisualTileKind.map:
+        return Alignment.topRight;
+      case InkVisualTileKind.spot:
+        return Alignment.bottomLeft;
+      case InkVisualTileKind.achievement:
+        return Alignment.bottomRight;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width?.w,
+      height: height?.h,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final resolvedWidth = constraints.maxWidth.isFinite
+              ? constraints.maxWidth
+              : (width ?? 72).w;
+          final resolvedHeight = constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : (height ?? width ?? 72).h;
+
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(radius.r),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: InkPalette.white,
+                borderRadius: BorderRadius.circular(radius.r),
+                border: Border.all(
+                  color: borderColor ?? InkPalette.line.withValues(alpha: 0.7),
+                ),
+              ),
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: _alignment,
+                  minWidth: resolvedWidth * 2,
+                  maxWidth: resolvedWidth * 2,
+                  minHeight: resolvedHeight * 2,
+                  maxHeight: resolvedHeight * 2,
+                  child: Image.asset(
+                    InkAssets.commercialTiles,
+                    width: resolvedWidth * 2,
+                    height: resolvedHeight * 2,
+                    fit: BoxFit.fill,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ModernMapGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final roadPaint = Paint()
+      ..color = InkPalette.white.withValues(alpha: 0.86)
+      ..strokeWidth = 16
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final roadBorder = Paint()
+      ..color = InkPalette.line.withValues(alpha: 0.92)
+      ..strokeWidth = 18
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final path = Path()
+      ..moveTo(-20, size.height * 0.28)
+      ..cubicTo(
+        size.width * 0.28,
+        size.height * 0.18,
+        size.width * 0.52,
+        size.height * 0.56,
+        size.width + 20,
+        size.height * 0.34,
+      );
+    canvas.drawPath(path, roadBorder);
+    canvas.drawPath(path, roadPaint);
+
+    final waterPaint = Paint()
+      ..color = InkPalette.lake.withValues(alpha: 0.10)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.06,
+          size.height * 0.56,
+          size.width * 0.58,
+          size.height * 0.30,
+        ),
+        Radius.circular(22),
+      ),
+      waterPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class InkInfoRow extends StatelessWidget {
@@ -1519,8 +1686,8 @@ class InkInfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        InkIconMark(icon: icon, color: color, size: 38, iconSize: 19),
-        SizedBox(width: 10.w),
+        InkIconMark(icon: icon, color: color, size: 40, iconSize: 20),
+        SizedBox(width: 11.w),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1531,18 +1698,19 @@ class InkInfoRow extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: InkPalette.text,
-                  fontSize: 14.sp,
+                  fontSize: 15.sp,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              SizedBox(height: 2.h),
+              SizedBox(height: 3.h),
               Text(
                 subtitle,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: InkPalette.muted,
-                  fontSize: 12.sp,
+                  fontSize: 12.5.sp,
+                  height: 1.28,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -1554,7 +1722,7 @@ class InkInfoRow extends StatelessWidget {
             trailing!,
             style: TextStyle(
               color: color,
-              fontSize: 12.sp,
+              fontSize: 12.5.sp,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1791,7 +1959,7 @@ void showInkFeatureSheet(
                   children: const [
                     Expanded(
                       child: InkMetric(
-                        value: '演示',
+                        value: '样例',
                         label: '数据状态',
                         icon: Icons.hub_rounded,
                         color: InkPalette.lake,
@@ -1834,116 +2002,6 @@ void showInkFeatureSheet(
       );
     },
   );
-}
-
-class _InkBrushStrokePainter extends CustomPainter {
-  const _InkBrushStrokePainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..strokeCap = StrokeCap.round;
-    final path = Path()
-      ..moveTo(0, size.height * 0.58)
-      ..cubicTo(
-        size.width * 0.20,
-        size.height * 0.16,
-        size.width * 0.50,
-        size.height * 0.22,
-        size.width,
-        size.height * 0.42,
-      )
-      ..lineTo(size.width * 0.96, size.height * 0.85)
-      ..cubicTo(
-        size.width * 0.65,
-        size.height,
-        size.width * 0.28,
-        size.height * 0.80,
-        0,
-        size.height * 0.92,
-      )
-      ..close();
-    canvas.drawPath(path, paint);
-
-    final dry = Paint()
-      ..color = color.withValues(alpha: 0.45)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1, size.height * 0.18)
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 3; i++) {
-      final y = size.height * (0.34 + i * 0.18);
-      canvas.drawLine(
-        Offset(size.width * (0.08 + i * 0.05), y),
-        Offset(size.width * (0.82 + i * 0.06), y + math.sin(i) * 2),
-        dry,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _InkBrushStrokePainter oldDelegate) {
-    return oldDelegate.color != color;
-  }
-}
-
-class _InkWashOverlayPainter extends CustomPainter {
-  const _InkWashOverlayPainter({required this.bright});
-
-  final bool bright;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final mist = Paint()
-      ..color = (bright ? InkPalette.rice : InkPalette.ink).withValues(
-        alpha: bright ? 0.10 : 0.14,
-      )
-      ..style = PaintingStyle.fill;
-    final wash = Path()
-      ..moveTo(0, size.height * 0.72)
-      ..cubicTo(
-        size.width * 0.22,
-        size.height * 0.62,
-        size.width * 0.42,
-        size.height * 0.84,
-        size.width * 0.62,
-        size.height * 0.72,
-      )
-      ..cubicTo(
-        size.width * 0.82,
-        size.height * 0.60,
-        size.width,
-        size.height * 0.82,
-        size.width,
-        size.height,
-      )
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(wash, mist);
-
-    final birdPaint = Paint()
-      ..color = InkPalette.ink.withValues(alpha: bright ? 0.26 : 0.42)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 4; i++) {
-      final x = size.width * (0.62 + i * 0.08);
-      final y = size.height * (0.12 + math.sin(i) * 0.03);
-      final bird = Path()
-        ..moveTo(x - 5, y)
-        ..quadraticBezierTo(x, y - 4, x + 5, y)
-        ..quadraticBezierTo(x + 9, y - 3, x + 13, y - 1);
-      canvas.drawPath(bird, birdPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _InkWashOverlayPainter oldDelegate) {
-    return oldDelegate.bright != bright;
-  }
 }
 
 class _RainRipplePainter extends CustomPainter {
@@ -2385,361 +2443,6 @@ class _InkIconMarkPainter extends CustomPainter {
   }
 }
 
-class _InkCardCornerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final mountain = Paint()
-      ..color = InkPalette.ink.withValues(alpha: 0.24)
-      ..style = PaintingStyle.fill;
-    final far = Path()
-      ..moveTo(0, size.height * 0.72)
-      ..quadraticBezierTo(
-        size.width * 0.18,
-        size.height * 0.34,
-        size.width * 0.36,
-        size.height * 0.70,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.54,
-        size.height * 0.28,
-        size.width * 0.74,
-        size.height * 0.68,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.88,
-        size.height * 0.48,
-        size.width,
-        size.height * 0.70,
-      )
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(far, mountain);
-
-    final water = Paint()
-      ..color = InkPalette.lake.withValues(alpha: 0.20)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 5; i++) {
-      final y = size.height * (0.72 + i * 0.055);
-      canvas.drawLine(
-        Offset(size.width * 0.18, y),
-        Offset(size.width * 0.96, y + math.sin(i) * 2),
-        water,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _InkBackdropPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFFFFFCF4), Color(0xFFF2F6EE)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, paint);
-
-    final grainPaint = Paint()
-      ..color = InkPalette.ink.withValues(alpha: 0.012)
-      ..style = PaintingStyle.fill;
-    for (var i = 0; i < 90; i++) {
-      final x = (i * 47) % size.width;
-      final y = (i * 83) % size.height;
-      canvas.drawCircle(Offset(x, y), (i % 3 + 1) * 0.45, grainPaint);
-    }
-
-    final wash = Paint()
-      ..color = InkPalette.lake.withValues(alpha: 0.038)
-      ..style = PaintingStyle.fill;
-    final path = Path()
-      ..moveTo(0, size.height * 0.1)
-      ..quadraticBezierTo(
-        size.width * 0.25,
-        size.height * 0.02,
-        size.width * 0.5,
-        size.height * 0.1,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.78,
-        size.height * 0.18,
-        size.width,
-        size.height * 0.08,
-      )
-      ..lineTo(size.width, size.height * 0.34)
-      ..quadraticBezierTo(
-        size.width * 0.52,
-        size.height * 0.26,
-        0,
-        size.height * 0.36,
-      )
-      ..close();
-    canvas.drawPath(path, wash);
-
-    final farMountain = Paint()
-      ..color = InkPalette.ink.withValues(alpha: 0.036)
-      ..style = PaintingStyle.fill;
-    for (var layer = 0; layer < 3; layer++) {
-      final base = size.height * (0.20 + layer * 0.065);
-      final mountain = Path()..moveTo(-20, base + 45);
-      for (var x = -20.0; x <= size.width + 40; x += size.width / 4) {
-        mountain.quadraticBezierTo(
-          x + size.width / 9,
-          base - 24 - math.sin(x / 70 + layer) * 12,
-          x + size.width / 4,
-          base + 38,
-        );
-      }
-      mountain.lineTo(size.width + 40, base + 88);
-      mountain.lineTo(-20, base + 88);
-      mountain.close();
-      canvas.drawPath(mountain, farMountain);
-    }
-
-    final bottomMountain = Paint()
-      ..color = InkPalette.ink.withValues(alpha: 0.052)
-      ..style = PaintingStyle.fill;
-    final bottom = Path()
-      ..moveTo(0, size.height * 0.94)
-      ..quadraticBezierTo(
-        size.width * 0.18,
-        size.height * 0.86,
-        size.width * 0.34,
-        size.height * 0.95,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.58,
-        size.height * 0.82,
-        size.width,
-        size.height * 0.94,
-      )
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(bottom, bottomMountain);
-
-    final line = Paint()
-      ..color = InkPalette.ink.withValues(alpha: 0.032)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    for (var i = 0; i < 7; i++) {
-      final y = size.height * (0.16 + i * 0.09);
-      final wave = Path()..moveTo(-20, y);
-      for (var x = -20.0; x < size.width + 20; x += 42) {
-        wave.quadraticBezierTo(x + 21, y + (i.isEven ? 5 : -5), x + 42, y);
-      }
-      canvas.drawPath(wave, line);
-    }
-
-    final bambooPaint = Paint()
-      ..color = InkPalette.pine.withValues(alpha: 0.09)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-    final bambooX = size.width - 34;
-    canvas.drawLine(
-      Offset(bambooX, size.height * 0.02),
-      Offset(bambooX - 18, size.height * 0.42),
-      bambooPaint,
-    );
-    for (var i = 0; i < 7; i++) {
-      final y = size.height * (0.06 + i * 0.055);
-      final leftLeaf = Path()
-        ..moveTo(bambooX - i * 2, y)
-        ..quadraticBezierTo(bambooX - 40, y - 9, bambooX - 58, y + 4);
-      final rightLeaf = Path()
-        ..moveTo(bambooX - i * 2, y + 7)
-        ..quadraticBezierTo(bambooX + 22, y - 2, bambooX + 34, y + 10);
-      canvas.drawPath(leftLeaf, bambooPaint);
-      canvas.drawPath(rightLeaf, bambooPaint);
-    }
-
-    final boatPaint = Paint()
-      ..color = InkPalette.ink.withValues(alpha: 0.16)
-      ..style = PaintingStyle.fill;
-    final boatY = size.height * 0.80;
-    final boat = Path()
-      ..moveTo(size.width * 0.10, boatY)
-      ..quadraticBezierTo(
-        size.width * 0.18,
-        boatY + 18,
-        size.width * 0.30,
-        boatY,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.22,
-        boatY + 28,
-        size.width * 0.12,
-        boatY + 16,
-      )
-      ..close();
-    canvas.drawPath(boat, boatPaint);
-    canvas.drawLine(
-      Offset(size.width * 0.20, boatY - 4),
-      Offset(size.width * 0.34, boatY - 48),
-      Paint()
-        ..color = InkPalette.ink.withValues(alpha: 0.12)
-        ..strokeWidth = 1.2
-        ..strokeCap = StrokeCap.round,
-    );
-
-    final fishPaint = Paint()
-      ..color = InkPalette.lake.withValues(alpha: 0.04)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
-    for (var i = 0; i < 5; i++) {
-      final center = Offset(size.width * (0.16 + i * 0.16), size.height * 0.86);
-      final fish = Path()
-        ..moveTo(center.dx - 13, center.dy)
-        ..quadraticBezierTo(center.dx, center.dy - 8, center.dx + 16, center.dy)
-        ..quadraticBezierTo(center.dx, center.dy + 8, center.dx - 13, center.dy)
-        ..moveTo(center.dx + 16, center.dy)
-        ..lineTo(center.dx + 25, center.dy - 7)
-        ..moveTo(center.dx + 16, center.dy)
-        ..lineTo(center.dx + 25, center.dy + 7);
-      canvas.drawPath(fish, fishPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _InkLandscapePainter extends CustomPainter {
-  const _InkLandscapePainter({required this.bright});
-
-  final bool bright;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final sky = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: bright
-            ? const [Color(0xFFDDEDE9), Color(0xFF8BB2B7), Color(0xFFF1D98E)]
-            : const [Color(0xFF34565C), Color(0xFF8FAEAC), Color(0xFFF4D486)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, sky);
-
-    final sunPaint = Paint()..color = const Color(0xFFFFD26F);
-    canvas.drawCircle(
-      Offset(size.width * 0.72, size.height * 0.43),
-      18.r,
-      sunPaint,
-    );
-
-    void drawMountain(Color color, double baseY, double amp, double shift) {
-      final path = Path()..moveTo(0, baseY);
-      for (var x = 0.0; x <= size.width; x += size.width / 5) {
-        path.lineTo(
-          x + shift,
-          baseY - amp * (0.45 + math.sin(x / 55 + shift) * 0.35),
-        );
-      }
-      path.lineTo(size.width, size.height);
-      path.lineTo(0, size.height);
-      path.close();
-      canvas.drawPath(path, Paint()..color = color);
-    }
-
-    drawMountain(
-      InkPalette.ink.withValues(alpha: 0.18),
-      size.height * 0.66,
-      70,
-      -20,
-    );
-    drawMountain(
-      InkPalette.lake.withValues(alpha: 0.24),
-      size.height * 0.72,
-      48,
-      14,
-    );
-    drawMountain(
-      InkPalette.ink.withValues(alpha: 0.32),
-      size.height * 0.82,
-      38,
-      36,
-    );
-
-    final water = Paint()
-      ..shader =
-          LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              InkPalette.lake.withValues(alpha: 0.34),
-              InkPalette.ink.withValues(alpha: 0.48),
-            ],
-          ).createShader(
-            Rect.fromLTWH(
-              0,
-              size.height * 0.62,
-              size.width,
-              size.height * 0.38,
-            ),
-          );
-    canvas.drawRect(
-      Rect.fromLTWH(0, size.height * 0.62, size.width, size.height * 0.38),
-      water,
-    );
-
-    final ripplePaint = Paint()
-      ..color = InkPalette.white.withValues(alpha: 0.28)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    for (var i = 0; i < 8; i++) {
-      final y = size.height * (0.66 + i * 0.04);
-      canvas.drawLine(
-        Offset(size.width * 0.14, y),
-        Offset(size.width * (0.86 - i * 0.03), y + math.sin(i) * 2),
-        ripplePaint,
-      );
-    }
-
-    final boatPaint = Paint()..color = InkPalette.ink.withValues(alpha: 0.75);
-    final boat = Path()
-      ..moveTo(size.width * 0.14, size.height * 0.7)
-      ..quadraticBezierTo(
-        size.width * 0.22,
-        size.height * 0.75,
-        size.width * 0.34,
-        size.height * 0.7,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.26,
-        size.height * 0.78,
-        size.width * 0.16,
-        size.height * 0.74,
-      )
-      ..close();
-    canvas.drawPath(boat, boatPaint);
-    canvas.drawCircle(
-      Offset(size.width * 0.22, size.height * 0.64),
-      5.r,
-      boatPaint,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.23, size.height * 0.65),
-      Offset(size.width * 0.4, size.height * 0.52),
-      Paint()
-        ..color = InkPalette.ink.withValues(alpha: 0.68)
-        ..strokeWidth = 1.2,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _InkLandscapePainter oldDelegate) {
-    return oldDelegate.bright != bright;
-  }
-}
-
 class _ScoreRingPainter extends CustomPainter {
   const _ScoreRingPainter(this.progress);
 
@@ -2835,7 +2538,6 @@ class _InkMapPainter extends CustomPainter {
             color: selected ? InkPalette.cinnabar : InkPalette.ink,
             fontSize: selected ? 13.sp : 12.sp,
             fontWeight: FontWeight.w900,
-            fontFamily: selected ? 'MaShanZheng' : 'ZCOOLXiaoWei',
             fontFamilyFallback: selected ? brushFontFallback : inkFontFallback,
           ),
         ),
@@ -2868,12 +2570,11 @@ class _InkMapPainter extends CustomPainter {
 
     final title = TextPainter(
       text: TextSpan(
-        text: '水墨鱼情图',
+        text: '智能鱼情图',
         style: TextStyle(
           color: InkPalette.ink.withValues(alpha: 0.80),
           fontSize: 17.sp,
           fontWeight: FontWeight.w900,
-          fontFamily: 'MaShanZheng',
           fontFamilyFallback: brushFontFallback,
         ),
       ),
@@ -2904,7 +2605,6 @@ class _InkMapPainter extends CustomPainter {
           color: InkPalette.cinnabar.withValues(alpha: 0.86),
           fontSize: 13.sp,
           fontWeight: FontWeight.w900,
-          fontFamily: 'MaShanZheng',
           fontFamilyFallback: brushFontFallback,
         ),
       ),

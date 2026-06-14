@@ -1,20 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
+import '../data/community_models.dart';
+import '../data/community_repository.dart';
 
-class CommunityScreen extends StatefulWidget {
+class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
 
   @override
-  State<CommunityScreen> createState() => _CommunityScreenState();
+  ConsumerState<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen> {
+class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   int _selectedTopic = 0;
   final Set<int> _likedPosts = {};
   final Set<int> _savedPosts = {};
+
+  List<CommunityPost> _realPosts = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFeed();
+  }
+
+  Future<void> _fetchFeed() async {
+    try {
+      final posts = await ref.read(communityRepositoryProvider).fetchFeed();
+      if (mounted) {
+        setState(() {
+          _realPosts = posts;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,36 +115,41 @@ class _CommunityScreenState extends State<CommunityScreen> {
               padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 0),
               child: _PublishFlowCard(onTap: () => _showPublishSheet(context)),
             ),
-            const InkSectionHeader(title: '今日推荐', subtitle: '优质动态与实战经验'),
+            const InkSectionHeader(title: '实时鱼情', subtitle: '设备水情、鱼获记录与钓友实战'),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 18.w),
-              child: Column(
-                children: [
-                  for (var i = 0; i < _posts.length; i++) ...[
-                    _PostCard(
-                      post: _posts[i],
-                      liked: _likedPosts.contains(i),
-                      saved: _savedPosts.contains(i),
-                      onTap: () => _showPostSheet(context, _posts[i]),
-                      onLike: () {
-                        setState(() {
-                          _likedPosts.contains(i)
-                              ? _likedPosts.remove(i)
-                              : _likedPosts.add(i);
-                        });
-                      },
-                      onSave: () {
-                        setState(() {
-                          _savedPosts.contains(i)
-                              ? _savedPosts.remove(i)
-                              : _savedPosts.add(i);
-                        });
-                      },
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _realPosts.isEmpty
+                  ? _CommunityEmptyCard(onTap: () => _showPublishSheet(context))
+                  : Column(
+                      children: [
+                        for (var i = 0; i < _realPosts.length; i++) ...[
+                          _PostCard(
+                            post: _realPosts[i],
+                            liked: _likedPosts.contains(_realPosts[i].id),
+                            saved: _savedPosts.contains(_realPosts[i].id),
+                            onTap: () => _showPostSheet(context, _realPosts[i]),
+                            onLike: () {
+                              setState(() {
+                                _likedPosts.contains(_realPosts[i].id)
+                                    ? _likedPosts.remove(_realPosts[i].id)
+                                    : _likedPosts.add(_realPosts[i].id);
+                              });
+                            },
+                            onSave: () {
+                              setState(() {
+                                _savedPosts.contains(_realPosts[i].id)
+                                    ? _savedPosts.remove(_realPosts[i].id)
+                                    : _savedPosts.add(_realPosts[i].id);
+                              });
+                            },
+                          ),
+                          if (i != _realPosts.length - 1)
+                            SizedBox(height: 12.h),
+                        ],
+                      ],
                     ),
-                    if (i != _posts.length - 1) SizedBox(height: 12.h),
-                  ],
-                ],
-              ),
             ),
             const InkSectionHeader(title: '成就与图鉴', subtitle: '低概率鱼获、挑战与鱼种收藏'),
             Padding(
@@ -197,7 +228,7 @@ class _CommunityHero extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '江湖今日榜',
+                      '鱼情雷达榜',
                       style: TextStyle(
                         color: InkPalette.text,
                         fontSize: 18.sp,
@@ -211,7 +242,7 @@ class _CommunityHero extends StatelessWidget {
                 ),
                 SizedBox(height: 8.h),
                 Text(
-                  '同城 126 条鱼情更新，花港浅湾热度上升，3 个战队正在约钓。',
+                  '设备水情、钓友鱼获和同城热区实时汇总，优先看可信鱼口。',
                   style: TextStyle(
                     color: InkPalette.muted,
                     fontSize: 12.sp,
@@ -226,6 +257,62 @@ class _CommunityHero extends StatelessWidget {
           SizedBox(
             width: 96.w,
             child: const InkLandscapeHero(height: 92, bright: false),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommunityEmptyCard extends StatelessWidget {
+  const _CommunityEmptyCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkCard(
+      padding: EdgeInsets.all(13.r),
+      onTap: onTap,
+      child: Column(
+        children: [
+          const InkInfoRow(
+            icon: Icons.sensors_rounded,
+            title: '暂无新的实况',
+            subtitle: '可以先发布一条鱼获或水情，让同城钓友看到最新窗口。',
+            trailing: '发布',
+            color: InkPalette.pine,
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            children: const [
+              Expanded(
+                child: InkMetric(
+                  value: '设备',
+                  label: '水情来源',
+                  icon: Icons.settings_input_antenna_rounded,
+                  color: InkPalette.pine,
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: InkMetric(
+                  value: '鱼获',
+                  label: '记录类型',
+                  icon: Icons.set_meal_rounded,
+                  color: InkPalette.lake,
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: InkMetric(
+                  value: '同城',
+                  label: '可见范围',
+                  icon: Icons.groups_rounded,
+                  color: InkPalette.reed,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -254,8 +341,8 @@ class _PublishFlowCard extends StatelessWidget {
         children: [
           const InkInfoRow(
             icon: Icons.add_photo_alternate_rounded,
-            title: '发布流程',
-            subtitle: '动态、鱼情、攻略和渔获档案统一入口',
+            title: '发布鱼获 / 鱼情',
+            subtitle: '照片、钓点、鱼种和设备水情统一生成记录',
             trailing: '发布',
             color: InkPalette.pine,
           ),
@@ -348,35 +435,25 @@ class _AchievementSystemCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: 12.h),
-          Row(
-            children: const [
-              Expanded(
-                child: _CommunityHonorMini(
-                  icon: Icons.military_tech_rounded,
-                  title: '称号榜',
-                  subtitle: '雨后巡水者',
-                  color: InkPalette.reed,
-                ),
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: _CommunityHonorMini(
-                  icon: Icons.emoji_events_rounded,
-                  title: '勋章墙',
-                  subtitle: '本月 +3',
-                  color: InkPalette.pine,
-                ),
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: _CommunityHonorMini(
-                  icon: Icons.menu_book_rounded,
-                  title: '图鉴',
-                  subtitle: '鳜鱼已解锁',
-                  color: InkPalette.lake,
-                ),
-              ),
-            ],
+          const _CommunityHonorMini(
+            icon: Icons.military_tech_rounded,
+            title: '称号榜',
+            subtitle: '当前佩戴：雨后巡水者 · 8/24 个称号',
+            color: InkPalette.reed,
+          ),
+          SizedBox(height: 8.h),
+          const _CommunityHonorMini(
+            icon: Icons.emoji_events_rounded,
+            title: '勋章墙',
+            subtitle: '本月新增：识水、守夜、互助',
+            color: InkPalette.pine,
+          ),
+          SizedBox(height: 8.h),
+          const _CommunityHonorMini(
+            icon: Icons.menu_book_rounded,
+            title: '鱼种图鉴',
+            subtitle: '最新解锁：鳜鱼 · 雨后回水湾',
+            color: InkPalette.lake,
           ),
         ],
       ),
@@ -402,33 +479,41 @@ class _CommunityHonorMini extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 9.h),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12.r),
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(13.r),
         border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Icon(icon, color: color, size: 20.w),
-          SizedBox(height: 5.h),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: InkPalette.text,
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: 2.h),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: InkPalette.muted,
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w800,
+          InkIconMark(icon: icon, color: color, size: 34, iconSize: 17),
+          SizedBox(width: 9.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.text,
+                    fontSize: 13.5.sp,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 3.h),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.muted,
+                    fontSize: 12.sp,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -447,7 +532,7 @@ class _PostCard extends StatelessWidget {
     required this.onSave,
   });
 
-  final _CommunityPost post;
+  final CommunityPost post;
   final bool liked;
   final bool saved;
   final VoidCallback onTap;
@@ -456,6 +541,7 @@ class _PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final likeCount = int.tryParse(post.likes) ?? 0;
     return InkCard(
       onTap: onTap,
       padding: EdgeInsets.all(12.r),
@@ -525,7 +611,7 @@ class _PostCard extends StatelessWidget {
                 icon: liked
                     ? Icons.thumb_up_alt_rounded
                     : Icons.thumb_up_alt_outlined,
-                value: liked ? '${int.parse(post.likes) + 1}' : post.likes,
+                value: liked ? '${likeCount + 1}' : post.likes,
                 active: liked,
                 onTap: onLike,
               ),
@@ -533,20 +619,7 @@ class _PostCard extends StatelessWidget {
               _PostAction(
                 icon: Icons.chat_bubble_outline_rounded,
                 value: post.comments,
-                onTap: () => showInkActionSheet(
-                  context,
-                  title: '评论',
-                  subtitle: '这条动态已有 ${post.comments} 条讨论',
-                  icon: Icons.chat_bubble_outline_rounded,
-                  actions: const [
-                    InkSheetAction(
-                      icon: Icons.edit_rounded,
-                      title: '写评论',
-                      subtitle: '补充你的钓法、天气或装备建议',
-                      color: InkPalette.pine,
-                    ),
-                  ],
-                ),
+                onTap: () => _showCommentSheet(context, post),
               ),
               SizedBox(width: 18.w),
               _PostAction(
@@ -602,44 +675,7 @@ class _PostAction extends StatelessWidget {
   }
 }
 
-class _CommunityPost {
-  const _CommunityPost({
-    required this.author,
-    required this.meta,
-    required this.tag,
-    required this.content,
-    required this.likes,
-    required this.comments,
-  });
-
-  final String author;
-  final String meta;
-  final String tag;
-  final String content;
-  final String likes;
-  final String comments;
-}
-
 const _topics = ['关注', '发现', '同城', '话题', '战队', '攻略'];
-
-const _posts = [
-  _CommunityPost(
-    author: '江湖钓客',
-    meta: '西湖区 · 20分钟前',
-    tag: '鱼情实况',
-    content: '清晨风小，花港一带近岸口不错。饵料别太腥，钓 1.2-1.8m 的缓坡更稳。',
-    likes: '35',
-    comments: '9',
-  ),
-  _CommunityPost(
-    author: '山水之间',
-    meta: '湘湖 · 1小时前',
-    tag: '路亚',
-    content: '今天亮片比米诺更好用，鱼群贴边巡游，抛投角度比饵型更关键。',
-    likes: '128',
-    comments: '21',
-  ),
-];
 
 const _achievements = [
   (Icons.emoji_events_rounded, '低概率挑战', '雨后 20 分钟中鳜鱼'),
@@ -654,30 +690,120 @@ void _showPublishSheet(BuildContext context) {
     subtitle: '选择内容类型，保持钓点隐私和安全提醒',
     icon: Icons.add_photo_alternate_rounded,
     color: InkPalette.pine,
+    children: [
+      Row(
+        children: const [
+          Expanded(
+            child: InkMetric(
+              value: '3步',
+              label: '发布流程',
+              icon: Icons.route_rounded,
+              color: InkPalette.pine,
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: InkMetric(
+              value: '默认脱敏',
+              label: '钓点隐私',
+              icon: Icons.location_off_rounded,
+              color: InkPalette.lake,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 10.h),
+      const InkInfoRow(
+        icon: Icons.photo_camera_rounded,
+        title: '1. 添加图片或鱼获',
+        subtitle: '可以从记录鱼获带入鱼种、尺寸、钓法和水情。',
+        color: InkPalette.pine,
+      ),
+      SizedBox(height: 9.h),
+      const InkInfoRow(
+        icon: Icons.topic_rounded,
+        title: '2. 选择内容类型',
+        subtitle: '动态偏交流，鱼情偏实时，攻略偏复盘沉淀。',
+        color: InkPalette.lake,
+      ),
+      SizedBox(height: 9.h),
+      const InkInfoRow(
+        icon: Icons.visibility_off_rounded,
+        title: '3. 确认可见范围',
+        subtitle: '默认隐藏精确坐标，只展示大致水域和安全提醒。',
+        color: InkPalette.moss,
+      ),
+    ],
     actions: const [
       InkSheetAction(
         icon: Icons.photo_camera_rounded,
         title: '发动态',
-        subtitle: '图片、文字、话题和同城水域',
+        subtitle: '图片、文字、话题和大致水域，适合日常分享',
         color: InkPalette.lake,
       ),
       InkSheetAction(
         icon: Icons.set_meal_rounded,
         title: '报鱼情',
-        subtitle: '鱼种、尺寸、钓法、天气和水情',
+        subtitle: '鱼种、尺寸、钓法、天气和水情，进入同城鱼情',
         color: InkPalette.pine,
       ),
       InkSheetAction(
         icon: Icons.edit_note_rounded,
         title: '写攻略',
-        subtitle: '复盘钓法、装备和路线',
+        subtitle: '复盘钓法、装备和路线，沉淀为攻略内容',
         color: InkPalette.moss,
       ),
     ],
   );
 }
 
-void _showPostSheet(BuildContext context, _CommunityPost post) {
+void _showCommentSheet(BuildContext context, CommunityPost post) {
+  showInkActionSheet(
+    context,
+    title: '评论讨论',
+    subtitle: '${post.author} · ${post.comments} 条讨论 · ${post.tag}',
+    icon: Icons.chat_bubble_outline_rounded,
+    color: InkPalette.pine,
+    children: [
+      const InkInfoRow(
+        icon: Icons.person_rounded,
+        title: '山水之间',
+        subtitle: '这个点早口更稳，亮片别收太快，先沿草边搜。',
+        color: InkPalette.lake,
+      ),
+      SizedBox(height: 9.h),
+      const InkInfoRow(
+        icon: Icons.person_rounded,
+        title: '夜钓守灯人',
+        subtitle: '如果是雨后，建议先确认岸边湿滑点，别贴太近。',
+        color: InkPalette.reed,
+      ),
+      SizedBox(height: 9.h),
+      const InkInfoRow(
+        icon: Icons.auto_awesome_rounded,
+        title: 'AI 摘要',
+        subtitle: '讨论集中在站位、收线速度和雨后安全，适合补充到复盘。',
+        color: InkPalette.moss,
+      ),
+    ],
+    actions: const [
+      InkSheetAction(
+        icon: Icons.edit_rounded,
+        title: '写评论',
+        subtitle: '补充你的钓法、天气或装备建议',
+        color: InkPalette.pine,
+      ),
+      InkSheetAction(
+        icon: Icons.bookmark_add_rounded,
+        title: '收藏讨论',
+        subtitle: '把有用评论保存到该水域复盘里',
+        color: InkPalette.lake,
+      ),
+    ],
+  );
+}
+
+void _showPostSheet(BuildContext context, CommunityPost post) {
   showInkActionSheet(
     context,
     title: post.author,

@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-# 登录请求模型：接收手机号和密码，演示环境使用固定账号。
+# 登录请求模型：接收手机号和密码，本地环境使用固定账号。
 class PasswordLoginRequest(BaseModel):
     """密码登录请求模型。"""
 

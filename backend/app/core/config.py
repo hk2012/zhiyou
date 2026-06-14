@@ -10,14 +10,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """应用配置。
 
-    后续部署到 1Panel 时，只需要通过环境变量覆盖这些字段，不用改代码。
+    部署到 1Panel 时，只需要通过环境变量覆盖这些字段，不用改代码。
     """
 
     app_name: str = "智友后台服务"
     app_version: str = "0.1.0"
     environment: str = "development"
     api_prefix: str = "/api/v1"
-    allowed_origins: str = Field(default="*", description="逗号分隔的跨域白名单")
+    allowed_origins: str = Field(
+        default=(
+            "http://127.0.0.1:5124,"
+            "http://localhost:5124,"
+            "http://127.0.0.1:5123,"
+            "http://localhost:5123"
+        ),
+        description="逗号分隔的跨域白名单，生产环境必须显式配置。",
+    )
+    allowed_origin_regex: Optional[str] = Field(
+        default=None,
+        description="可选 CORS 正则；开发环境未配置时自动允许本机和私有局域网来源。",
+    )
 
     database_url: Optional[str] = Field(
         default=None,
@@ -43,12 +55,27 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> list[str]:
         if self.allowed_origins.strip() == "*":
-            return ["*"]
+            return []
         return [
             origin.strip()
             for origin in self.allowed_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def cors_allow_origin_regex(self) -> Optional[str]:
+        if self.allowed_origin_regex:
+            return self.allowed_origin_regex
+        if self.environment == "production":
+            return None
+        return (
+            r"^https?://("
+            r"localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|"
+            r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+            r"172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|"
+            r"192\.168\.\d{1,3}\.\d{1,3}"
+            r")(:\d+)?$"
+        )
 
     @property
     def effective_database_url(self) -> str:

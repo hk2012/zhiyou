@@ -17,7 +17,7 @@ def test_mall_summary_loads_market_data(client: TestClient) -> None:
 
     assert response.status_code == 200
     data = response.json()
-    assert data["categories"][0]["label"] == "渔具租赁"
-    assert data["hero_slides"][0]["title"] == "新手低门槛出钓方案"
-    assert data["service_items"][0]["badge"] == "¥39/天"
+    assert data["categories"][0]["label"] == "鱼竿"
+    assert data["hero_slides"][0]["title"] == "钓无界 趣无穷"
+    assert data["service_items"][0]["badge"] == "¥599"
     assert data["partners"][0]["name"] == "千岛湖钓旅"

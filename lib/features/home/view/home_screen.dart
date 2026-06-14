@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -8,6 +10,7 @@ import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
 import '../data/home_recommendation_models.dart';
 import '../data/home_recommendation_repository.dart';
+import '../providers/iot_device_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -19,12 +22,46 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _scenarioIndex = 0;
   bool _isRefreshing = false;
+  final List<_FishingMockScenario> _scenarios = List.from(_mockScenarios);
 
-  _FishingMockScenario get _scenario => _mockScenarios[_scenarioIndex];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchRealData(requestPrecise: true);
+      unawaited(
+        ref.read(iotDevicesProvider.notifier).refreshFromApi(silent: true),
+      );
+    });
+  }
+
+  Future<void> _fetchRealData({bool requestPrecise = true}) async {
+    try {
+      final repo = ref.read(homeRecommendationRepositoryProvider);
+      final loc = await repo.resolveLocation(requestPrecise: requestPrecise);
+      final summary = await repo.fetchSummary(
+        enabledCardIds: [],
+        location: loc,
+      );
+      if (mounted) {
+        setState(() {
+          _scenarios[0] = _mapRealSummaryToMock(
+            summary,
+            _mockScenarios[0],
+            loc,
+          );
+        });
+      }
+    } catch (_) {
+      // Keep mock if error
+    }
+  }
+
+  _FishingMockScenario get _scenario => _scenarios[_scenarioIndex];
 
   Future<void> _refreshScenario() async {
     setState(() => _isRefreshing = true);
-    await Future<void>.delayed(const Duration(milliseconds: 720));
+    await _fetchRealData(requestPrecise: true);
     if (!mounted) return;
     setState(() => _isRefreshing = false);
   }
@@ -32,6 +69,82 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _selectScenario(int index) {
     if (_scenarioIndex == index) return;
     setState(() => _scenarioIndex = index);
+  }
+
+  _FishingMockScenario _mapRealSummaryToMock(
+    HomeRecommendationSummary summary,
+    _FishingMockScenario fallback,
+    HomeLocation location,
+  ) {
+    final isReal = location.isDeviceLocation;
+    final statusText = isReal
+        ? '📍 GPS定位 · 刚刚更新'
+        : '默认钓点 · ${location.statusMessage}';
+    return _FishingMockScenario(
+      id: summary.recommendationId?.toString() ?? fallback.id,
+      railLabel: fallback.railLabel,
+      railIcon: fallback.railIcon,
+      location: summary.locationName,
+      updateText: statusText,
+      alertBadge: fallback.alertBadge,
+      heroAsset: fallback.heroAsset,
+      heroAlignment: fallback.heroAlignment,
+      weather: fallback.weather,
+      weatherIcon: fallback.weatherIcon,
+      waterTemp: fallback.waterTemp,
+      depth: fallback.depth,
+      score: summary.conclusion.score,
+      scoreLabel: summary.conclusion.score >= 80
+          ? '极佳'
+          : (summary.conclusion.score >= 60 ? '良好' : '较差'),
+      conclusion: summary.conclusion.title,
+      target: summary.fishTargets.isNotEmpty
+          ? summary.fishTargets.first.fish
+          : fallback.target,
+      summary: summary.conclusion.summary,
+      bestTime: summary.conclusion.bestTime,
+      spotHint: summary.conclusion.spotHint,
+      avoid: summary.avoidAdvices.isNotEmpty
+          ? summary.avoidAdvices.first.title
+          : fallback.avoid,
+      primaryAction: fallback.primaryAction,
+      navigationHint: fallback.navigationHint,
+      planTitle: fallback.planTitle,
+      planSubtitle: fallback.planSubtitle,
+      modeLabel: fallback.modeLabel,
+      confidence: fallback.confidence,
+      dataSource: isReal ? '实时GPS定位 + 规则引擎' : '默认钓点 + 规则引擎',
+      gearShort: summary.conclusion.rigHint.isNotEmpty
+          ? summary.conclusion.rigHint
+          : fallback.gearShort,
+      gearDetail: fallback.gearDetail,
+      gearChecklist: fallback.gearChecklist,
+      deviceTitle: fallback.deviceTitle,
+      deviceSubtitle: fallback.deviceSubtitle,
+      deviceState: fallback.deviceState,
+      safetyIcon: fallback.safetyIcon,
+      safetyTitle: fallback.safetyTitle,
+      safetySubtitle: fallback.safetySubtitle,
+      safetyLevel: fallback.safetyLevel,
+      safetyColor: fallback.safetyColor,
+      accent: fallback.accent,
+      steps: fallback.steps,
+      evidence: summary.conclusion.reasons.isNotEmpty
+          ? summary.conclusion.reasons
+                .map(
+                  (r) => _EvidenceItem(
+                    icon: Icons.check_circle_outline,
+                    title: r,
+                    subtitle: '',
+                    trailing: '',
+                    color: InkPalette.pine,
+                  ),
+                )
+                .toList()
+          : fallback.evidence,
+      fishMethods: fallback.fishMethods,
+      spots: fallback.spots,
+    );
   }
 
   @override
@@ -58,11 +171,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 isRefreshing: _isRefreshing,
                 onRefresh: _refreshScenario,
               ),
-              _ScenarioRail(
-                scenarios: _mockScenarios,
-                activeIndex: _scenarioIndex,
-                onSelected: _selectScenario,
-              ),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 260),
                 switchInCurve: Curves.easeOutCubic,
@@ -87,32 +195,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: const _RefreshingBanner(),
                       ),
                     Padding(
-                      padding: EdgeInsets.fromLTRB(18.w, 10.h, 18.w, 0),
+                      padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
                       child: _DecisionHeroCard(
                         scenario: scenario,
                         onDetails: () =>
                             _showScenarioDetailSheet(context, scenario),
-                        onPrimary: () => context.go(AppRouteNames.explore),
-                        onPlan: () => _showPlanSheet(context, scenario),
+                        onPrimary: () => _showPlanSheet(context, scenario),
+                        onPlan: () => _showGearSheet(context, scenario),
                       ),
                     ),
+                    _ScenarioRail(
+                      scenarios: _mockScenarios,
+                      activeIndex: _scenarioIndex,
+                      onSelected: _selectScenario,
+                    ),
                     InkSectionHeader(
-                      title: '今日出钓计划',
-                      subtitle: scenario.planSubtitle,
-                      action: '现场修正',
-                      onAction: () => _showFieldTuneSheet(context, scenario),
+                      title: '智能装备摘要',
+                      subtitle: '设备在线状态、核心数据和出发前提醒',
+                      action: '同步',
+                      onAction: () async {
+                        final fromApi = await ref
+                            .read(iotDevicesProvider.notifier)
+                            .refreshFromApi();
+                        if (!context.mounted) return;
+                        AppFeedback.showMessage(
+                          context,
+                          fromApi ? '设备数据已从后端同步' : '后端不可用，已使用本地设备快照',
+                        );
+                      },
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _TodayPlanCard(
-                        scenario: scenario,
-                        onOpenPlan: () => _showPlanSheet(context, scenario),
-                        onTune: () => _showFieldTuneSheet(context, scenario),
-                      ),
+                      child: _IotCommandCenter(scenario: scenario),
                     ),
-                    const InkSectionHeader(
-                      title: '一键行动',
-                      subtitle: '从出发、到水边、钓后记录形成闭环',
+                    InkSectionHeader(
+                      title: '开始作钓',
+                      subtitle: '出发、到点校准、装备核对、记录鱼获',
+                      action: '计划',
+                      onAction: () => _showPlanSheet(context, scenario),
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
@@ -123,6 +243,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         onGear: () => _showGearSheet(context, scenario),
                         onCatch: () =>
                             context.push(AppRouteNames.creationModal),
+                      ),
+                    ),
+                    InkSectionHeader(
+                      title: '附近钓场',
+                      subtitle: '按当前场景重新排序',
+                      action: '地图',
+                      onAction: () => context.go(AppRouteNames.explore),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 18.w),
+                      child: _SpotRecommendationList(scenario: scenario),
+                    ),
+                    InkSectionHeader(
+                      title: '作钓补给',
+                      subtitle: '装备包、钓位预约和会员权益',
+                      action: '商城',
+                      onAction: () => context.go(AppRouteNames.mall),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 18.w),
+                      child: _CommerceConversionPanel(scenario: scenario),
+                    ),
+                    InkSectionHeader(
+                      title: '精选渔获',
+                      subtitle: '真实记录、低概率挑战和分享入口',
+                      action: '发布',
+                      onAction: () => context.push(AppRouteNames.creationModal),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 18.w),
+                      child: _FeaturedCatchPanel(
+                        scenario: scenario,
+                        onRecord: () =>
+                            context.push(AppRouteNames.creationModal),
+                      ),
+                    ),
+                    InkSectionHeader(
+                      title: '今日作钓计划',
+                      subtitle: scenario.planSubtitle,
+                      action: '现场修正',
+                      onAction: () => _showFieldTuneSheet(context, scenario),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 18.w),
+                      child: _TodayPlanCard(
+                        scenario: scenario,
+                        onOpenPlan: () => _showPlanSheet(context, scenario),
+                        onTune: () => _showFieldTuneSheet(context, scenario),
                       ),
                     ),
                     InkSectionHeader(
@@ -144,16 +312,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
                       child: _FishMethodMatrix(scenario: scenario),
                     ),
-                    InkSectionHeader(
-                      title: '附近钓点',
-                      subtitle: '按当前场景重新排序',
-                      action: '地图',
-                      onAction: () => context.go(AppRouteNames.explore),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _SpotRecommendationList(scenario: scenario),
-                    ),
                     const InkSectionHeader(
                       title: '辅助信号',
                       subtitle: '设备、安全、真实鱼获轻量提示',
@@ -162,7 +320,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
                       child: _AuxiliarySignalList(
                         scenario: scenario,
-                        onDevice: () => _showDeviceSheet(context, scenario),
+                        onDevice: () => _showDeviceSheet(
+                          context,
+                          scenario,
+                          ref.read(iotDevicesProvider),
+                        ),
                       ),
                     ),
                   ],
@@ -198,6 +360,11 @@ class _HomeTopBar extends StatelessWidget {
             children: [
               const InkBrand(compact: true),
               const Spacer(),
+              InkRoundButton(
+                icon: Icons.shopping_cart_outlined,
+                onTap: () => context.go(AppRouteNames.mall),
+              ),
+              SizedBox(width: 8.w),
               InkRoundButton(
                 icon: Icons.notifications_none_rounded,
                 badge: scenario.alertBadge,
@@ -351,6 +518,767 @@ class _RefreshingBanner extends StatelessWidget {
   }
 }
 
+class _CommerceConversionPanel extends StatelessWidget {
+  const _CommerceConversionPanel({required this.scenario});
+
+  final _FishingMockScenario scenario;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkGlassCard(
+      padding: EdgeInsets.all(13.r),
+      child: Column(
+        children: [
+          const InkInfoRow(
+            icon: Icons.local_offer_rounded,
+            title: '商业化 Banner',
+            subtitle: '基于鱼情、设备和附近钓场生成可直接购买方案',
+            trailing: '领券',
+            color: InkPalette.reed,
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            children: [
+              Expanded(
+                child: _ConversionDealTile(
+                  icon: Icons.inventory_2_rounded,
+                  title: 'AI 装备包',
+                  price: '¥199',
+                  meta: '3件套 · 省¥46',
+                  cta: '一键加购',
+                  color: InkPalette.reed,
+                  onTap: () => context.go(AppRouteNames.mall),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: _ConversionDealTile(
+                  icon: Icons.event_seat_rounded,
+                  title: '附近钓位',
+                  price: '¥68起',
+                  meta: '剩余 12 位',
+                  cta: '立即预约',
+                  color: scenario.accent,
+                  onTap: () => context.go(AppRouteNames.explore),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          InkPressable(
+            onTap: () => context.go(AppRouteNames.profile),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 10.h),
+              decoration: BoxDecoration(
+                color: InkPalette.lake.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16.r),
+                border: Border.all(
+                  color: InkPalette.lake.withValues(alpha: 0.14),
+                ),
+              ),
+              child: Row(
+                children: [
+                  InkIconMark(
+                    icon: Icons.workspace_premium_rounded,
+                    color: InkPalette.lake,
+                    size: 34,
+                    iconSize: 17,
+                  ),
+                  SizedBox(width: 9.w),
+                  Expanded(
+                    child: Text(
+                      '开通会员享商城会员价、钓位优先约、设备数据趋势',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.text,
+                        fontSize: 12.5.sp,
+                        height: 1.3,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Text(
+                    '开通',
+                    style: TextStyle(
+                      color: InkPalette.lake,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: InkPalette.lake,
+                    size: 16.w,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConversionDealTile extends StatelessWidget {
+  const _ConversionDealTile({
+    required this.icon,
+    required this.title,
+    required this.price,
+    required this.meta,
+    required this.cta,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String price;
+  final String meta;
+  final String cta;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkPressable(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(11.r),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.09),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 18.w),
+                SizedBox(width: 6.w),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: InkPalette.text,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 9.h),
+            Text(
+              price,
+              maxLines: 1,
+              style: TextStyle(
+                color: color,
+                fontSize: 20.sp,
+                height: 1,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(height: 5.h),
+            Text(
+              meta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.muted,
+                fontSize: 11.5.sp,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: 10.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 7.h),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                cta,
+                maxLines: 1,
+                style: TextStyle(
+                  color: InkPalette.white,
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IotCommandCenter extends ConsumerWidget {
+  const _IotCommandCenter({required this.scenario});
+
+  final _FishingMockScenario scenario;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final devices = ref.watch(iotDevicesProvider);
+    final summary = ref.watch(iotDeviceSummaryProvider);
+    final loadState = ref.watch(iotDeviceLoadStateProvider);
+    final coreDevice = summary.coreDevice;
+
+    return InkGlassCard(
+      padding: EdgeInsets.all(13.r),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48.w,
+                height: 48.w,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      InkPalette.pine,
+                      Color.lerp(InkPalette.lake, scenario.accent, 0.42)!,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(18.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: InkPalette.pine.withValues(alpha: 0.20),
+                      blurRadius: 18,
+                      offset: Offset(0, 8.h),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.settings_input_antenna_rounded,
+                  color: InkPalette.white,
+                  size: 24.w,
+                ),
+              ),
+              SizedBox(width: 11.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '设备状态与复购提醒',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.text,
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+                    Text(
+                      '${coreDevice.title} · ${coreDevice.telemetryLabel} ${coreDevice.telemetryValue} · 配件可补货',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.muted,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              InkChip(
+                label: '${summary.onlineCount}/${summary.totalCount}',
+                active: true,
+                color: scenario.accent,
+              ),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          _IotSourceBanner(state: loadState, accent: scenario.accent),
+          SizedBox(height: 12.h),
+          Row(
+            children: [
+              Expanded(
+                child: _IotSummaryMetric(
+                  icon: Icons.sensors_rounded,
+                  label: '在线设备',
+                  value: '${summary.onlineCount}台',
+                  color: scenario.accent,
+                ),
+              ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: _IotSummaryMetric(
+                  icon: Icons.battery_charging_full_rounded,
+                  label: '最低电量',
+                  value: '${summary.lowestBattery}%',
+                  color: InkPalette.moss,
+                ),
+              ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: _IotSummaryMetric(
+                  icon: Icons.network_check_rounded,
+                  label: '平均信号',
+                  value: '${summary.averageSignal}%',
+                  color: InkPalette.lake,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 11.h),
+          Container(
+            padding: EdgeInsets.all(11.r),
+            decoration: BoxDecoration(
+              color: scenario.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(
+                color: scenario.accent.withValues(alpha: 0.14),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkIconMark(
+                  icon: _iotDeviceIcon(coreDevice.type),
+                  color: scenario.accent,
+                  size: 36,
+                  iconSize: 18,
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '设备结论：${coreDevice.actionHint}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: InkPalette.text,
+                          fontSize: 13.sp,
+                          height: 1.34,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 5.h),
+                      Text(
+                        summary.warningCount == 0
+                            ? '全部设备状态稳定，可以直接按今日计划执行。'
+                            : '${summary.warningCount} 台设备需要关注，出发前建议同步或校准。',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: InkPalette.muted,
+                          fontSize: 11.5.sp,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 12.h),
+          SizedBox(
+            height: 162.h,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: devices.length,
+              separatorBuilder: (_, _) => SizedBox(width: 10.w),
+              itemBuilder: (context, index) {
+                final device = devices[index];
+                return _IotDeviceCard(
+                  device: device,
+                  accent: scenario.accent,
+                  onTap: () {
+                    ref
+                        .read(iotDevicesProvider.notifier)
+                        .toggleDevice(device.id);
+                    AppFeedback.showMessage(
+                      context,
+                      device.isActive
+                          ? '${device.title} 已切到待机'
+                          : '${device.title} 已启动',
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            children: [
+              Expanded(
+                child: InkPrimaryButton(
+                  label: '购买配件',
+                  icon: Icons.shopping_bag_rounded,
+                  color: InkPalette.reed,
+                  onTap: () => context.go(AppRouteNames.mall),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: InkSecondaryButton(
+                  label: '申请维修',
+                  icon: Icons.build_circle_outlined,
+                  onTap: () => _showDeviceCalibrationSheet(context, scenario),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IotSummaryMetric extends StatelessWidget {
+  const _IotSummaryMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minHeight: 76.h),
+      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 9.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(15.r),
+        border: Border.all(color: color.withValues(alpha: 0.13)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 15.w),
+              SizedBox(width: 5.w),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.muted,
+                    fontSize: 10.5.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: InkPalette.text,
+              fontSize: 17.sp,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IotSourceBanner extends StatelessWidget {
+  const _IotSourceBanner({required this.state, required this.accent});
+
+  final IotDeviceLoadState state;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = state.isFromApi ? accent : InkPalette.reed;
+    final icon = state.isFromApi
+        ? Icons.cloud_done_rounded
+        : Icons.cloud_off_rounded;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            state.isLoading ? Icons.sync_rounded : icon,
+            color: color,
+            size: 16.w,
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  state.isFromApi ? '后端设备数据' : '本地兜底快照',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.text,
+                    fontSize: 11.5.sp,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  state.message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.muted,
+                    fontSize: 10.5.sp,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (state.isLoading) ...[
+                  SizedBox(height: 6.h),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      minHeight: 3.h,
+                      color: color,
+                      backgroundColor: color.withValues(alpha: 0.12),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IotDeviceCard extends StatelessWidget {
+  const _IotDeviceCard({
+    required this.device,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final IotDeviceState device;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = device.isActive
+        ? _iotDeviceColor(device, accent)
+        : InkPalette.faint;
+    final signal = device.signalLevel.clamp(0, 100) / 100;
+
+    return SizedBox(
+      width: 182.w,
+      child: InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: device.isActive
+            ? InkPalette.white.withValues(alpha: 0.88)
+            : InkPalette.paper.withValues(alpha: 0.74),
+        borderColor: color.withValues(alpha: device.isActive ? 0.22 : 0.14),
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                InkIconMark(
+                  icon: _iotDeviceIcon(device.type),
+                  color: color,
+                  size: 36,
+                  iconSize: 18,
+                ),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        device.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: InkPalette.text,
+                          fontSize: 12.5.sp,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        device.sceneRole,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: InkPalette.muted,
+                          fontSize: 10.5.sp,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10.h),
+            Text(
+              device.telemetryValue,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 21.sp,
+                height: 1,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              '${device.telemetryLabel} · ${device.workingState}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.muted,
+                fontSize: 10.8.sp,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                _IotMiniPill(
+                  label: device.isActive ? '运行' : '待机',
+                  color: color,
+                ),
+                SizedBox(width: 6.w),
+                _IotMiniPill(label: device.riskLabel, color: color),
+              ],
+            ),
+            SizedBox(height: 8.h),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: signal,
+                      minHeight: 5.h,
+                      color: color,
+                      backgroundColor: InkPalette.line.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  '${device.batteryLevel}%',
+                  style: TextStyle(
+                    color: InkPalette.text,
+                    fontSize: 10.5.sp,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IotMiniPill extends StatelessWidget {
+  const _IotMiniPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 10.sp,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+IconData _iotDeviceIcon(String type) {
+  return switch (type) {
+    'float' => Icons.sensors_rounded,
+    'sonar' => Icons.radar_rounded,
+    'box' => Icons.inventory_2_rounded,
+    'umbrella' => Icons.beach_access_rounded,
+    'platform' => Icons.layers_rounded,
+    _ => Icons.settings_input_antenna_rounded,
+  };
+}
+
+Color _iotDeviceColor(IotDeviceState device, Color accent) {
+  if (!device.isActive &&
+      device.riskLabel != '异常' &&
+      device.riskLabel != '离线' &&
+      device.riskLabel != '待校准') {
+    return InkPalette.faint;
+  }
+  return switch (device.riskLabel) {
+    '异常' || '离线' => InkPalette.cinnabar,
+    '低电量' => InkPalette.reed,
+    '待校准' => InkPalette.cinnabar,
+    '提醒' => InkPalette.reed,
+    _ => switch (device.type) {
+      'float' => accent,
+      'sonar' => InkPalette.lake,
+      'box' => InkPalette.moss,
+      'umbrella' => InkPalette.reed,
+      'platform' => InkPalette.pine,
+      _ => accent,
+    },
+  };
+}
+
 class _DecisionHeroCard extends StatelessWidget {
   const _DecisionHeroCard({
     required this.scenario,
@@ -373,13 +1301,21 @@ class _DecisionHeroCard extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset(
-                scenario.heroAsset,
-                fit: BoxFit.cover,
-                alignment: scenario.heroAlignment,
-                errorBuilder: (context, error, stackTrace) {
-                  return const InkLandscapeHero(height: 314, bright: true);
-                },
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      scenario.accent,
+                      Color.lerp(scenario.accent, InkPalette.lake, 0.48)!,
+                      InkPalette.ink,
+                    ],
+                  ),
+                ),
+                child: CustomPaint(
+                  painter: _ModernDecisionHeroPainter(color: scenario.accent),
+                ),
               ),
             ),
             Positioned.fill(
@@ -398,7 +1334,7 @@ class _DecisionHeroCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 15.h, 16.w, 16.h),
+              padding: EdgeInsets.fromLTRB(12.w, 12.h, 12.w, 12.h),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -410,6 +1346,10 @@ class _DecisionHeroCard extends StatelessWidget {
                           spacing: 7.w,
                           runSpacing: 7.h,
                           children: [
+                            const _FrostTag(
+                              icon: Icons.auto_graph_rounded,
+                              label: '智能适钓指数',
+                            ),
                             _FrostTag(
                               icon: scenario.weatherIcon,
                               label: scenario.weather,
@@ -429,7 +1369,7 @@ class _DecisionHeroCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  SizedBox(height: 22.h),
+                  SizedBox(height: 10.h),
                   _HeroReadabilityPanel(
                     scenario: scenario,
                     onPrimary: onPrimary,
@@ -442,6 +1382,70 @@ class _DecisionHeroCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ModernDecisionHeroPainter extends CustomPainter {
+  const _ModernDecisionHeroPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = InkPalette.white.withValues(alpha: 0.12)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    for (var i = 0; i < 6; i++) {
+      final y = size.height * (0.18 + i * 0.12);
+      final path = Path()
+        ..moveTo(-20, y)
+        ..cubicTo(
+          size.width * 0.24,
+          y - 22,
+          size.width * 0.56,
+          y + 26,
+          size.width + 20,
+          y - 12,
+        );
+      canvas.drawPath(path, linePaint);
+    }
+
+    final sensorPaint = Paint()
+      ..color = InkPalette.white.withValues(alpha: 0.14)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (var i = 0; i < 4; i++) {
+      canvas.drawCircle(
+        Offset(size.width * (0.18 + i * 0.22), size.height * 0.30),
+        18 + i * 8,
+        sensorPaint,
+      );
+    }
+
+    final glowPaint = Paint()
+      ..shader =
+          RadialGradient(
+            colors: [
+              Color.lerp(
+                color,
+                InkPalette.white,
+                0.28,
+              )!.withValues(alpha: 0.24),
+              Colors.transparent,
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(size.width * 0.82, size.height * 0.22),
+              radius: size.width * 0.48,
+            ),
+          );
+    canvas.drawRect(Offset.zero & size, glowPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ModernDecisionHeroPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }
 
@@ -460,7 +1464,7 @@ class _HeroReadabilityPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(12.w, 12.h, 12.w, 12.h),
+      padding: EdgeInsets.fromLTRB(11.w, 10.h, 11.w, 11.h),
       decoration: BoxDecoration(
         color: InkPalette.ink.withValues(alpha: 0.58),
         borderRadius: BorderRadius.circular(20.r),
@@ -477,15 +1481,14 @@ class _HeroReadabilityPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            scenario.conclusion,
+            '适钓指数 ${scenario.score} · ${scenario.conclusion}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.white,
-              fontSize: 32.sp,
-              height: 1.02,
+              fontSize: 22.sp,
+              height: 1.08,
               fontWeight: FontWeight.w900,
-              fontFamily: 'MaShanZheng',
               fontFamilyFallback: brushFontFallback,
               shadows: const [
                 Shadow(
@@ -496,33 +1499,33 @@ class _HeroReadabilityPanel extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(height: 7.h),
+          SizedBox(height: 5.h),
           Text(
             '主攻：${scenario.target}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.white,
-              fontSize: 19.sp,
+              fontSize: 15.sp,
               height: 1.16,
               fontWeight: FontWeight.w900,
               shadows: const [Shadow(color: Color(0xAA000000), blurRadius: 8)],
             ),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 7.h),
           Text(
             scenario.summary,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.white.withValues(alpha: 0.96),
-              fontSize: 13.5.sp,
-              height: 1.48,
+              fontSize: 12.sp,
+              height: 1.34,
               fontWeight: FontWeight.w800,
               shadows: const [Shadow(color: Color(0x99000000), blurRadius: 6)],
             ),
           ),
-          SizedBox(height: 13.h),
+          SizedBox(height: 10.h),
           Row(
             children: [
               Expanded(
@@ -550,13 +1553,13 @@ class _HeroReadabilityPanel extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 14.h),
+          SizedBox(height: 12.h),
           Row(
             children: [
               Expanded(
                 child: InkPrimaryButton(
-                  label: scenario.primaryAction,
-                  icon: Icons.near_me_rounded,
+                  label: '开始作钓',
+                  icon: Icons.play_arrow_rounded,
                   color: scenario.accent,
                   onTap: onPrimary,
                 ),
@@ -564,9 +1567,9 @@ class _HeroReadabilityPanel extends StatelessWidget {
               SizedBox(width: 10.w),
               Expanded(
                 child: InkPrimaryButton(
-                  label: '钓法方案',
-                  icon: Icons.auto_awesome_rounded,
-                  color: InkPalette.lake,
+                  label: '装备方案',
+                  icon: Icons.inventory_2_rounded,
+                  color: InkPalette.reed,
                   onTap: onPlan,
                 ),
               ),
@@ -632,8 +1635,8 @@ class _DecisionScoreRing extends StatelessWidget {
       curve: Curves.easeOutCubic,
       builder: (context, value, _) {
         return Container(
-          width: 74.w,
-          height: 74.w,
+          width: 66.w,
+          height: 66.w,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: [
@@ -654,7 +1657,7 @@ class _DecisionScoreRing extends StatelessWidget {
                     '$score',
                     style: TextStyle(
                       color: InkPalette.white,
-                      fontSize: 24.sp,
+                      fontSize: 22.sp,
                       height: 1,
                       fontWeight: FontWeight.w900,
                     ),
@@ -736,7 +1739,7 @@ class _HeroMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 7.h),
       decoration: BoxDecoration(
         color: InkPalette.ink.withValues(alpha: 0.34),
         borderRadius: BorderRadius.circular(14.r),
@@ -763,14 +1766,14 @@ class _HeroMetric extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 4.h),
+          SizedBox(height: 3.h),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.white,
-              fontSize: 12.5.sp,
+              fontSize: 12.sp,
               fontWeight: FontWeight.w900,
               shadows: const [Shadow(color: Color(0x99000000), blurRadius: 5)],
             ),
@@ -897,37 +1900,10 @@ class _TodayPlanCard extends StatelessWidget {
               ),
               SizedBox(width: 10.w),
               Expanded(
-                child: InkPressable(
+                child: InkSecondaryButton(
+                  label: '现场修正',
+                  icon: Icons.tune_rounded,
                   onTap: onTune,
-                  child: Container(
-                    height: 50.h,
-                    decoration: BoxDecoration(
-                      color: InkPalette.white.withValues(alpha: 0.78),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: InkPalette.ink.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.tune_rounded,
-                          color: InkPalette.pine,
-                          size: 18.w,
-                        ),
-                        SizedBox(width: 6.w),
-                        Text(
-                          '现场修正',
-                          style: TextStyle(
-                            color: InkPalette.pine,
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -1712,6 +2688,9 @@ class _SpotRecommendationList extends StatelessWidget {
           _SpotCard(
             spot: scenario.spots[i],
             accent: scenario.accent,
+            visualKind: i.isEven
+                ? InkVisualTileKind.spot
+                : InkVisualTileKind.map,
             onTap: () =>
                 _showSpotDetailSheet(context, scenario, scenario.spots[i]),
           ),
@@ -1726,11 +2705,13 @@ class _SpotCard extends StatelessWidget {
   const _SpotCard({
     required this.spot,
     required this.accent,
+    required this.visualKind,
     required this.onTap,
   });
 
   final _SpotMock spot;
   final Color accent;
+  final InkVisualTileKind visualKind;
   final VoidCallback onTap;
 
   @override
@@ -1743,9 +2724,32 @@ class _SpotCard extends StatelessWidget {
           SizedBox(
             width: 92.w,
             height: 70.h,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14.r),
-              child: const InkMiniMap(height: 70),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: InkCommercialVisual(kind: visualKind, radius: 14),
+                ),
+                Positioned(
+                  right: 7.w,
+                  top: 7.h,
+                  child: Container(
+                    width: 24.w,
+                    height: 24.w,
+                    decoration: BoxDecoration(
+                      color: InkPalette.white.withValues(alpha: 0.92),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: InkPalette.ink.withValues(alpha: 0.10),
+                          blurRadius: 10,
+                          offset: Offset(0, 4.h),
+                        ),
+                      ],
+                    ),
+                    child: Icon(Icons.place_rounded, size: 15.w, color: accent),
+                  ),
+                ),
+              ],
             ),
           ),
           SizedBox(width: 12.w),
@@ -1840,23 +2844,265 @@ class _SpotCard extends StatelessWidget {
   }
 }
 
-class _AuxiliarySignalList extends StatelessWidget {
+class _FeaturedCatchPanel extends StatelessWidget {
+  const _FeaturedCatchPanel({required this.scenario, required this.onRecord});
+
+  final _FishingMockScenario scenario;
+  final VoidCallback onRecord;
+
+  @override
+  Widget build(BuildContext context) {
+    final catches = [
+      (
+        icon: Icons.auto_awesome_rounded,
+        title: scenario.fishMethods.first.fish,
+        subtitle: '${scenario.fishMethods.first.method} · ${scenario.spotHint}',
+        meta: '命中 ${scenario.score} 分窗口',
+        color: scenario.accent,
+      ),
+      (
+        icon: Icons.workspace_premium_rounded,
+        title: '低概率挑战',
+        subtitle: '${scenario.fishMethods.last.fish} · ${scenario.avoid}',
+        meta: '挑战榜 +36 积分',
+        color: InkPalette.reed,
+      ),
+    ];
+
+    return InkGlassCard(
+      padding: EdgeInsets.all(13.r),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              InkIconMark(
+                icon: Icons.photo_library_rounded,
+                color: scenario.accent,
+                size: 42,
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '今日精选渔获',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.text,
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 3.h),
+                    Text(
+                      '记录鱼获会反哺推荐模型，也能解锁勋章和积分',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.muted,
+                        fontSize: 11.5.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              InkChip(label: '+积分', active: true, color: InkPalette.reed),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            children: [
+              for (var i = 0; i < catches.length; i++) ...[
+                Expanded(
+                  child: _FeaturedCatchCard(
+                    icon: catches[i].icon,
+                    title: catches[i].title,
+                    subtitle: catches[i].subtitle,
+                    meta: catches[i].meta,
+                    color: catches[i].color,
+                  ),
+                ),
+                if (i != catches.length - 1) SizedBox(width: 10.w),
+              ],
+            ],
+          ),
+          SizedBox(height: 12.h),
+          InkPressable(
+            onTap: onRecord,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 11.h),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    scenario.accent,
+                    Color.lerp(scenario.accent, InkPalette.lake, 0.42)!,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(18.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: scenario.accent.withValues(alpha: 0.20),
+                    blurRadius: 18,
+                    offset: Offset(0, 8.h),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.add_photo_alternate_rounded,
+                    color: InkPalette.white,
+                    size: 21.w,
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      '记录本次渔获，生成分享图和成长积分',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.white,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    color: InkPalette.white,
+                    size: 18.w,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeaturedCatchCard extends StatelessWidget {
+  const _FeaturedCatchCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.meta,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String meta;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minHeight: 130.h),
+      padding: EdgeInsets.all(11.r),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18.r),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            height: 50.h,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color, Color.lerp(color, InkPalette.ink, 0.24)!],
+              ),
+              borderRadius: BorderRadius.circular(15.r),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -6.w,
+                  top: -9.h,
+                  child: Icon(
+                    Icons.set_meal_rounded,
+                    color: InkPalette.white.withValues(alpha: 0.18),
+                    size: 62.w,
+                  ),
+                ),
+                Center(
+                  child: Icon(icon, color: InkPalette.white, size: 24.w),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 10.h),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: InkPalette.text,
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: InkPalette.muted,
+              fontSize: 11.2.sp,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            meta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 11.5.sp,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuxiliarySignalList extends ConsumerWidget {
   const _AuxiliarySignalList({required this.scenario, required this.onDevice});
 
   final _FishingMockScenario scenario;
   final VoidCallback onDevice;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summary = ref.watch(iotDeviceSummaryProvider);
+    final coreDevice = summary.coreDevice;
+
     return InkCard(
       padding: EdgeInsets.all(12.r),
       child: Column(
         children: [
           InkInfoRow(
             icon: Icons.sensors_rounded,
-            title: scenario.deviceTitle,
-            subtitle: scenario.deviceSubtitle,
-            trailing: scenario.deviceState,
+            title: '物联安全与水情',
+            subtitle:
+                '${coreDevice.title} · ${coreDevice.telemetryLabel} ${coreDevice.telemetryValue}',
+            trailing: '${summary.onlineCount}/${summary.totalCount}',
             color: scenario.accent,
           ),
           SizedBox(height: 12.h),
@@ -1873,8 +3119,8 @@ class _AuxiliarySignalList extends StatelessWidget {
               SizedBox(width: 8.w),
               Expanded(
                 child: InkMetric(
-                  value: scenario.depth,
-                  label: '水深',
+                  value: coreDevice.signalLevel >= 70 ? scenario.depth : '需校准',
+                  label: '水深可信度',
                   icon: Icons.stacked_line_chart_rounded,
                   color: InkPalette.lake,
                 ),
@@ -2819,37 +4065,10 @@ class _FieldTuneSheetState extends ConsumerState<_FieldTuneSheet> {
                     ),
                     SizedBox(width: 10.w),
                     Expanded(
-                      child: InkPressable(
+                      child: InkSecondaryButton(
+                        label: '恢复默认',
+                        icon: Icons.restart_alt_rounded,
                         onTap: _resetDefaults,
-                        child: Container(
-                          height: 50.h,
-                          decoration: BoxDecoration(
-                            color: InkPalette.white.withValues(alpha: 0.78),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: InkPalette.ink.withValues(alpha: 0.16),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.restart_alt_rounded,
-                                color: InkPalette.pine,
-                                size: 18.w,
-                              ),
-                              SizedBox(width: 6.w),
-                              Text(
-                                '恢复默认',
-                                style: TextStyle(
-                                  color: InkPalette.pine,
-                                  fontSize: 15.sp,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ],
@@ -4141,28 +5360,10 @@ class _GearChecklistSheetState extends State<_GearChecklistSheet> {
                 Row(
                   children: [
                     Expanded(
-                      child: InkPressable(
+                      child: InkSecondaryButton(
+                        label: '全部勾选',
+                        icon: Icons.checklist_rounded,
                         onTap: _markAll,
-                        child: Container(
-                          height: 50.h,
-                          decoration: BoxDecoration(
-                            color: InkPalette.white.withValues(alpha: 0.78),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: InkPalette.ink.withValues(alpha: 0.16),
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '全部勾选',
-                              style: TextStyle(
-                                color: InkPalette.pine,
-                                fontSize: 15.sp,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                     SizedBox(width: 10.w),
@@ -4465,11 +5666,17 @@ class _SafetyLine extends StatelessWidget {
   }
 }
 
-void _showDeviceSheet(BuildContext context, _FishingMockScenario scenario) {
+void _showDeviceSheet(
+  BuildContext context,
+  _FishingMockScenario scenario, [
+  List<IotDeviceState> devices = const [],
+]) {
   showInkActionSheet(
     context,
-    title: scenario.deviceTitle,
-    subtitle: scenario.deviceSubtitle,
+    title: devices.isEmpty ? scenario.deviceTitle : '物联设备详情',
+    subtitle: devices.isEmpty
+        ? scenario.deviceSubtitle
+        : '${devices.where((device) => device.isActive).length}/${devices.length} 台在线 · ${scenario.location}',
     icon: Icons.sensors_rounded,
     color: scenario.accent,
     children: [
@@ -4491,6 +5698,13 @@ void _showDeviceSheet(BuildContext context, _FishingMockScenario scenario) {
           ),
         ],
       ),
+      if (devices.isNotEmpty) ...[
+        SizedBox(height: 12.h),
+        for (var i = 0; i < devices.length; i++) ...[
+          _DeviceSheetRow(device: devices[i], accent: scenario.accent),
+          if (i != devices.length - 1) SizedBox(height: 8.h),
+        ],
+      ],
     ],
     actions: [
       InkSheetAction(
@@ -4509,6 +5723,87 @@ void _showDeviceSheet(BuildContext context, _FishingMockScenario scenario) {
       ),
     ],
   );
+}
+
+class _DeviceSheetRow extends StatelessWidget {
+  const _DeviceSheetRow({required this.device, required this.accent});
+
+  final IotDeviceState device;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _iotDeviceColor(device, accent);
+    return InkCard(
+      padding: EdgeInsets.all(10.r),
+      color: InkPalette.paper.withValues(alpha: 0.74),
+      borderColor: color.withValues(alpha: 0.16),
+      child: Row(
+        children: [
+          InkIconMark(
+            icon: _iotDeviceIcon(device.type),
+            color: color,
+            size: 38,
+            iconSize: 18,
+          ),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  device.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.text,
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 3.h),
+                Text(
+                  '${device.sceneRole} · ${device.workingState}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.muted,
+                    fontSize: 11.5.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                device.telemetryValue,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12.5.sp,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: 3.h),
+              Text(
+                '${device.batteryLevel}% · ${device.signalLevel}%',
+                style: TextStyle(
+                  color: InkPalette.muted,
+                  fontSize: 10.5.sp,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 void _showDeviceSyncSheet(BuildContext context, _FishingMockScenario scenario) {

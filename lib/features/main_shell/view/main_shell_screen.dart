@@ -52,20 +52,20 @@ class _InkBottomNav extends StatelessWidget {
     final safeBottom = MediaQuery.of(context).viewPadding.bottom;
     return Container(
       margin: EdgeInsets.fromLTRB(
-        14.w,
+        12.w,
         0,
-        14.w,
-        safeBottom > 0 ? safeBottom : 12.h,
+        12.w,
+        safeBottom > 0 ? safeBottom : 10.h,
       ),
-      height: 72.h,
+      height: 68.h,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28.r),
+        borderRadius: BorderRadius.circular(24.r),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: InkPalette.rice.withValues(alpha: 0.96),
-              borderRadius: BorderRadius.circular(28.r),
+              borderRadius: BorderRadius.circular(24.r),
               border: Border.all(color: InkPalette.ink.withValues(alpha: 0.20)),
               boxShadow: [
                 BoxShadow(
@@ -79,16 +79,16 @@ class _InkBottomNav extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _NavItem(
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home_rounded,
-                  label: '首页',
+                  icon: Icons.auto_awesome_outlined,
+                  activeIcon: Icons.auto_awesome_rounded,
+                  label: '推荐',
                   active: currentIndex == 0,
                   onTap: () => onTap(0),
                 ),
                 _NavItem(
-                  icon: Icons.map_outlined,
-                  activeIcon: Icons.map_rounded,
-                  label: '钓点',
+                  icon: Icons.place_outlined,
+                  activeIcon: Icons.place_rounded,
+                  label: '钓场',
                   active: currentIndex == 1,
                   onTap: () => onTap(1),
                 ),
@@ -97,13 +97,13 @@ class _InkBottomNav extends StatelessWidget {
                   pressedScale: 0.94,
                   rippleColor: InkPalette.reed,
                   child: SizedBox(
-                    width: 58.w,
+                    width: 52.w,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 52.w,
-                          height: 52.w,
+                          width: 42.w,
+                          height: 42.w,
                           margin: EdgeInsets.only(bottom: 2.h),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
@@ -125,7 +125,17 @@ class _InkBottomNav extends StatelessWidget {
                           child: Icon(
                             Icons.add_rounded,
                             color: InkPalette.white,
-                            size: 30.w,
+                            size: 25.w,
+                          ),
+                        ),
+                        Text(
+                          '发布',
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: InkPalette.ink,
+                            fontSize: 10.5.sp,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
@@ -133,9 +143,9 @@ class _InkBottomNav extends StatelessWidget {
                   ),
                 ),
                 _NavItem(
-                  icon: Icons.forum_outlined,
-                  activeIcon: Icons.forum_rounded,
-                  label: '鱼圈',
+                  icon: Icons.shopping_bag_outlined,
+                  activeIcon: Icons.shopping_bag_rounded,
+                  label: '商城',
                   active: currentIndex == 2,
                   onTap: () => onTap(2),
                 ),
@@ -177,24 +187,29 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 58.w,
+        width: 54.w,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(active ? activeIcon : icon, color: color, size: 23.w),
-            SizedBox(height: 4.h),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12.sp,
-                fontWeight: active ? FontWeight.w900 : FontWeight.w800,
+            Icon(active ? activeIcon : icon, color: color, size: 22.w),
+            SizedBox(height: 3.h),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11.5.sp,
+                  height: 1.1,
+                  fontWeight: active ? FontWeight.w900 : FontWeight.w800,
+                ),
               ),
             ),
-            SizedBox(height: 4.h),
+            SizedBox(height: 3.h),
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              width: active ? 18.w : 0,
+              width: active ? 16.w : 0,
               height: 3.h,
               decoration: BoxDecoration(
                 color: InkPalette.pine,

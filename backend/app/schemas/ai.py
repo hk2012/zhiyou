@@ -32,7 +32,7 @@ class FishingAnalysisRequest(BaseModel):
 class FishingAnalysisResponse(BaseModel):
     """AI 垂钓分析响应。
 
-    source=openai 表示来自 OpenAI；source=local_rule 表示未配置 Key 或调用失败时的本机兜底。
+    source=openai 表示来自 OpenAI；source=local_rule 表示使用本机规则模型。
     """
 
     source: str

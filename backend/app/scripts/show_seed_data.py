@@ -54,7 +54,7 @@ def main() -> None:
 
         catch = db.scalar(select(CatchRecord).where(CatchRecord.is_low_probability.is_(True)))
         if catch:
-            print("\n低概率战绩演示：")
+            print("\n低概率战绩样例：")
             print(f"- {catch.fish} / {catch.method} / {catch.probability_at_time}% / {catch.praise_title}")
 
 

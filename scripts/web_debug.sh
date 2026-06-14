@@ -11,11 +11,13 @@ set -euo pipefail
 #   ./scripts/web_debug.sh 5124
 #   ./scripts/web_debug.sh --help
 #   API_BASE_URL=http://127.0.0.1:8080 ./scripts/web_debug.sh
+#   API_ENV=web API_BASE_URL=http://127.0.0.1:8080 ./scripts/web_debug.sh
 #
 # 参数说明：
 #   第 1 个参数：Web 调试端口，默认 5123。
 #   WEB_HOSTNAME：Web 服务绑定地址，默认 0.0.0.0。
 #   API_BASE_URL：后端接口地址，默认 http://127.0.0.1:8080。
+#   API_ENV：API 环境，默认 web。
 #   SKIP_BUILD=1：跳过 flutter build web，直接托管已有 build/web。
 #   KEEP_PORT=1：不清理端口上的旧进程；默认会先关闭旧服务。
 
@@ -29,8 +31,23 @@ fi
 WEB_PORT="${1:-5123}"
 WEB_HOSTNAME="${WEB_HOSTNAME:-0.0.0.0}"
 API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:8080}"
+API_ENV="${API_ENV:-web}"
 
 cd "$PROJECT_ROOT"
+
+install_browser_probe_files() {
+  local build_dir="$PROJECT_ROOT/build/web"
+
+  if [[ ! -d "$build_dir" ]]; then
+    return
+  fi
+
+  echo "==> 补齐浏览器探测静态文件"
+  mkdir -p "$build_dir/.well-known/appspecific"
+  cp "$PROJECT_ROOT/web/.well-known/appspecific/com.chrome.devtools.json" \
+    "$build_dir/.well-known/appspecific/com.chrome.devtools.json"
+  cp "$PROJECT_ROOT/web/flutter.js.map" "$build_dir/flutter.js.map"
+}
 
 stop_existing_server() {
   local pids
@@ -55,6 +72,7 @@ echo "==> 项目目录: $PROJECT_ROOT"
 echo "==> 绑定地址: $WEB_HOSTNAME"
 echo "==> Web 端口: $WEB_PORT"
 echo "==> 接口地址: $API_BASE_URL"
+echo "==> API 环境: $API_ENV"
 echo "==> Mac 本机访问: http://localhost:$WEB_PORT/#/login"
 echo "==> 手机/局域网访问: http://$(ipconfig getifaddr en0 2>/dev/null || echo '<Mac局域网IP>'):$WEB_PORT/#/login"
 
@@ -64,7 +82,22 @@ fi
 
 if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   echo "==> 构建 Flutter Web 产物。"
-  flutter build web --pwa-strategy=none --dart-define="API_BASE_URL=$API_BASE_URL"
+  flutter build web \
+    --release \
+    --pwa-strategy=none \
+    --no-web-resources-cdn \
+    --optimization-level=4 \
+    --no-source-maps \
+    --dart-define="API_ENV=$API_ENV" \
+    --dart-define="API_BASE_URL=$API_BASE_URL"
+fi
+
+install_browser_probe_files
+
+if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
+  if [[ "${PRECOMPRESS_WEB:-1}" == "1" ]]; then
+    "$PROJECT_ROOT/scripts/web_precompress.sh"
+  fi
 fi
 
 echo "==> 启动静态 Web 服务，终端中按 Ctrl+C 可退出。"

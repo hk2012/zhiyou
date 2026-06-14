@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../core/constants/app_colors.dart';
+import 'app_base_components.dart';
 
 class AppErrorView extends StatelessWidget {
   const AppErrorView({
@@ -21,50 +22,53 @@ class AppErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(24.w),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64.w,
-              height: 64.w,
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
+        padding: EdgeInsets.all(AppSpacing.xxxl.w),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 320.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppIconPill(
+                icon: Icons.error_outline_rounded,
+                tone: AppTone.danger,
+                size: 64,
               ),
-              child: Icon(
-                Icons.error_outline,
-                color: AppColors.error,
-                size: 32.w,
-              ),
-            ),
-            SizedBox(height: 14.h),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.onSurface,
-                fontSize: 18.sp,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (message != null) ...[
-              SizedBox(height: 6.h),
+              SizedBox(height: AppSpacing.xl.h),
               Text(
-                message!,
+                title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.onSurfaceVariant,
-                  fontSize: 13.sp,
-                  height: 1.4,
+                  color: AppColors.textPrimary,
+                  fontSize: 18.sp,
+                  height: 1.2,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
                 ),
               ),
+              if (message != null) ...[
+                SizedBox(height: AppSpacing.sm.h),
+                Text(
+                  message!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13.sp,
+                    height: 1.42,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+              if (actionLabel != null && onAction != null) ...[
+                SizedBox(height: AppSpacing.xxl.h),
+                AppActionButton(
+                  label: actionLabel!,
+                  onPressed: onAction,
+                  tone: AppTone.danger,
+                ),
+              ],
             ],
-            if (actionLabel != null && onAction != null) ...[
-              SizedBox(height: 16.h),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -87,32 +91,41 @@ class AppEmptyView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(24.w),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 44.w, color: AppColors.onSurfaceVariant),
-            SizedBox(height: 10.h),
-            Text(
-              title,
-              style: TextStyle(
-                color: AppColors.onSurface,
-                fontSize: 16.sp,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (message != null) ...[
-              SizedBox(height: 4.h),
+        padding: EdgeInsets.all(AppSpacing.xxxl.w),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 320.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIconPill(icon: icon, tone: AppTone.neutral, size: 58),
+              SizedBox(height: AppSpacing.lg.h),
               Text(
-                message!,
+                title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.onSurfaceVariant,
-                  fontSize: 12.sp,
+                  color: AppColors.textPrimary,
+                  fontSize: 16.sp,
+                  height: 1.22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
                 ),
               ),
+              if (message != null) ...[
+                SizedBox(height: AppSpacing.sm.h),
+                Text(
+                  message!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12.5.sp,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

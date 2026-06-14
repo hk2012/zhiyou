@@ -175,7 +175,7 @@ class HomeLocationService {
     name: '千岛湖 · 东南湖区',
     latitude: 29.594,
     longitude: 119.054,
-    statusMessage: '未获取到真实定位，使用演示默认钓点',
+    statusMessage: '未获取到真实定位，使用默认钓点',
   );
 
   HomeLocation? _cachedDeviceLocation;

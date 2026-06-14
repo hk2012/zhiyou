@@ -12,8 +12,8 @@ set -euo pipefail
 # 常用示例：
 #   ./scripts/ios_debug.sh
 #   ./scripts/ios_debug.sh --help
-#   ./scripts/ios_debug.sh 00008110-00190C520168401E http://192.168.1.10:8080
-#   API_BASE_URL=http://192.168.1.10:8080 ./scripts/ios_debug.sh ios
+#   ./scripts/ios_debug.sh 00008110-00190C520168401E http://<Mac局域网IP>:8080
+#   API_BASE_URL=http://<Mac局域网IP>:8080 ./scripts/ios_debug.sh ios
 #
 # 参数说明：
 #   第 1 个参数：设备 ID，默认 ios。可先执行 flutter devices 查看真实设备 ID。
@@ -44,8 +44,16 @@ detect_lan_ip() {
 }
 
 LAN_IP="$(detect_lan_ip)"
-DEFAULT_API_BASE_URL="http://${LAN_IP:-192.168.1.10}:8080"
-API_BASE_URL="${2:-${API_BASE_URL:-$DEFAULT_API_BASE_URL}}"
+if [[ -n "${2:-}" ]]; then
+  API_BASE_URL="$2"
+elif [[ -n "${API_BASE_URL:-}" ]]; then
+  API_BASE_URL="$API_BASE_URL"
+elif [[ -n "$LAN_IP" ]]; then
+  API_BASE_URL="http://$LAN_IP:8080"
+else
+  echo "错误：未检测到 Mac 局域网 IP，请手动指定 API_BASE_URL=http://<Mac局域网IP>:8080" >&2
+  exit 1
+fi
 
 cd "$PROJECT_ROOT"
 
@@ -58,4 +66,5 @@ flutter devices
 echo "==> 启动 iOS 真机调试，终端中按 r 热加载、R 热重启、q 退出。"
 flutter run \
   -d "$DEVICE_ID" \
+  --dart-define="API_ENV=device" \
   --dart-define="API_BASE_URL=$API_BASE_URL"

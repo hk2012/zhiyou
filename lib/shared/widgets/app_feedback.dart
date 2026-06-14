@@ -27,7 +27,7 @@ class AppFeedback {
     showInkFeatureSheet(
       context,
       title: feature,
-      subtitle: '已整理为前端交互方案，当前使用演示数据预览。',
+      subtitle: '已整理为完整交互方案，当前使用样例数据预览。',
     );
   }
 }

@@ -6,7 +6,7 @@ set -euo pipefail
 # 启动顺序：
 #   1. 关闭指定端口上的旧后端服务。
 #   2. 准备 Python 虚拟环境和依赖。
-#   3. 初始化本地 SQLite 数据库和首页种子数据。
+#   3. 初始化本地 SQLite 数据库和基础种子数据。
 #   4. 后台启动 FastAPI。
 #
 # 常用示例：
@@ -55,7 +55,7 @@ then
   pip install -r requirements.txt
 fi
 
-echo "==> 初始化本地数据库和首页种子数据"
+echo "==> 初始化本地数据库和基础种子数据"
 python -m app.scripts.init_db
 
 echo "==> 启动 FastAPI 后端"

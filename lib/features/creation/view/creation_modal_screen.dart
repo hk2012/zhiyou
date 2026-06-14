@@ -4,13 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 
-import '../../../features/home/data/home_recommendation_models.dart';
-import '../../../features/home/data/home_recommendation_repository.dart';
+import '../../../features/creation/data/catch_journal_repository.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
 
 class CreationModalScreen extends ConsumerStatefulWidget {
-  const CreationModalScreen({super.key});
+  const CreationModalScreen({super.key, this.initialSpot});
+
+  final String? initialSpot;
 
   @override
   ConsumerState<CreationModalScreen> createState() =>
@@ -26,7 +30,48 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
   bool _autoLayout = true;
   bool _savingDraft = false;
   bool _publishing = false;
-  bool _photoAttached = false;
+  final List<String> _photoPaths = [];
+
+  Future<void> _handlePhotoCapture() async {
+    showInkActionSheet(
+      context,
+      title: '添加照片',
+      subtitle: '支持现场拍摄或从相册多选',
+      icon: Icons.camera_alt_rounded,
+      actions: [
+        InkSheetAction(
+          title: '拍一张照片',
+          subtitle: '记录当下实况',
+          icon: Icons.camera_alt_outlined,
+          onTap: () async {
+            final status = await Permission.camera.request();
+            if (status.isGranted) {
+              final photo = await ImagePicker().pickImage(
+                source: ImageSource.camera,
+              );
+              if (photo != null && mounted) {
+                setState(() => _photoPaths.add(photo.path));
+              }
+            }
+          },
+        ),
+        InkSheetAction(
+          title: '从相册选择',
+          subtitle: '支持多图模式',
+          icon: Icons.photo_library_outlined,
+          onTap: () async {
+            final status = await Permission.photos.request();
+            if (status.isGranted || status.isLimited) {
+              final photos = await ImagePicker().pickMultiImage();
+              if (photos.isNotEmpty && mounted) {
+                setState(() => _photoPaths.addAll(photos.map((e) => e.path)));
+              }
+            }
+          },
+        ),
+      ],
+    );
+  }
 
   String _spot = '千岛湖 · 东南湖区';
   String _fish = '翘嘴';
@@ -42,6 +87,15 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
     _weightController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final initialSpot = widget.initialSpot?.trim();
+    if (initialSpot != null && initialSpot.isNotEmpty) {
+      _spot = initialSpot;
+    }
   }
 
   bool get _busy => _savingDraft || _publishing;
@@ -88,17 +142,24 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
     });
 
     try {
-      final location = HomeLocation(name: _spot, source: 'manual');
       final result = await ref
-          .read(homeRecommendationRepositoryProvider)
-          .recordCatch(
-            location: location,
+          .read(catchJournalRepositoryProvider)
+          .save(
+            spotName: _spot,
             fish: _fish,
             method: _method,
+            waterClarity: _waterClarity,
+            biteStatus: _bite,
+            deviceStatus: _device,
             probability: _probability,
-            praiseTitle: _title,
+            title: _title,
             shareCopy: _shareCopy,
             visibility: publish ? _publishVisibility : 'private',
+            status: publish ? 'published' : 'draft',
+            autoLayout: _autoLayout,
+            photoLabels: _photoPaths.isNotEmpty
+                ? [_fish, _method, _waterClarity]
+                : [],
             lengthCm: _numberFrom(_lengthController.text),
             weightJin: _numberFrom(_weightController.text),
             notes: _noteController.text,
@@ -112,7 +173,7 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
           : '已保存草稿';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$action：${result.praiseTitle}'),
+          content: Text('$action：${result.title}'),
           behavior: SnackBarBehavior.floating,
           backgroundColor: InkPalette.ink,
         ),
@@ -244,19 +305,10 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
         fish: _fish,
         lengthController: _lengthController,
         weightController: _weightController,
-        photoAttached: _photoAttached,
+        photoPaths: _photoPaths,
         onSpot: (value) => setState(() => _spot = value),
         onFish: (value) => setState(() => _fish = value),
-        onPhotoTap: () {
-          setState(() => _photoAttached = true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已添加鱼获封面，并生成识别标签'),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: InkPalette.ink,
-            ),
-          );
-        },
+        onPhotoTap: _handlePhotoCapture,
       );
     }
     if (_step == 1) {
@@ -284,7 +336,7 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
       device: _device,
       visibility: _visibility,
       probability: _probability,
-      hasPhoto: _photoAttached,
+      hasPhoto: _photoPaths.isNotEmpty,
       onAutoLayout: (value) => setState(() => _autoLayout = value),
       onVisibility: (value) => setState(() => _visibility = value),
     );
@@ -425,7 +477,7 @@ class _CatchBasicsStep extends StatelessWidget {
     required this.fish,
     required this.lengthController,
     required this.weightController,
-    required this.photoAttached,
+    required this.photoPaths,
     required this.onSpot,
     required this.onFish,
     required this.onPhotoTap,
@@ -435,7 +487,7 @@ class _CatchBasicsStep extends StatelessWidget {
   final String fish;
   final TextEditingController lengthController;
   final TextEditingController weightController;
-  final bool photoAttached;
+  final List<String> photoPaths;
   final ValueChanged<String> onSpot;
   final ValueChanged<String> onFish;
   final VoidCallback onPhotoTap;
@@ -452,7 +504,7 @@ class _CatchBasicsStep extends StatelessWidget {
           color: InkPalette.pine,
         ),
         SizedBox(height: 10.h),
-        _PhotoStubCard(attached: photoAttached, fish: fish, onTap: onPhotoTap),
+        _PhotoStubCard(photoPaths: photoPaths, fish: fish, onTap: onPhotoTap),
         SizedBox(height: 10.h),
         _OptionCard(
           title: '水域',
@@ -465,7 +517,7 @@ class _CatchBasicsStep extends StatelessWidget {
         SizedBox(height: 10.h),
         _OptionCard(
           title: '鱼种',
-          subtitle: '鱼种是后续鱼情模型最重要的标签。',
+          subtitle: '鱼种会进入下一次鱼情模型，是最重要的标签。',
           options: const ['翘嘴', '鲫鱼', '鲤鱼', '鲶鱼', '鲈鱼', '黄颡'],
           selected: fish,
           color: InkPalette.moss,
@@ -697,104 +749,140 @@ class _GuideCard extends StatelessWidget {
 
 class _PhotoStubCard extends StatelessWidget {
   const _PhotoStubCard({
-    required this.attached,
+    required this.photoPaths,
     required this.fish,
     required this.onTap,
   });
 
-  final bool attached;
+  final List<String> photoPaths;
   final String fish;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkCard(
-      padding: EdgeInsets.all(12.r),
-      color: InkPalette.ink.withValues(alpha: 0.90),
-      borderColor: InkPalette.white.withValues(alpha: 0.18),
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 74.w,
-            height: 74.w,
-            decoration: BoxDecoration(
-              color: attached
-                  ? InkPalette.lake.withValues(alpha: 0.70)
-                  : InkPalette.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16.r),
-              border: Border.all(
-                color: InkPalette.white.withValues(alpha: 0.18),
-              ),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  right: -8.w,
-                  bottom: -8.h,
-                  child: Icon(
-                    Icons.set_meal_rounded,
-                    color: InkPalette.white.withValues(alpha: 0.18),
-                    size: 52.w,
-                  ),
-                ),
-                Center(
-                  child: Icon(
-                    attached
-                        ? Icons.image_rounded
-                        : Icons.add_photo_alternate_rounded,
-                    color: InkPalette.white,
-                    size: 28.w,
-                  ),
-                ),
-              ],
-            ),
+    if (photoPaths.isEmpty) {
+      return InkCard(
+        padding: EdgeInsets.zero,
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          height: 140.h,
+          decoration: BoxDecoration(
+            color: InkPalette.ink.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(16.r),
           ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  attached ? '已添加鱼获封面' : '添加鱼获照片',
-                  style: TextStyle(
-                    color: InkPalette.white,
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w900,
-                  ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.add_a_photo_rounded,
+                color: InkPalette.muted,
+                size: 28.w,
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                '添加鱼获照片',
+                style: TextStyle(
+                  color: InkPalette.muted,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w800,
                 ),
-                SizedBox(height: 5.h),
-                Text(
-                  attached
-                      ? '识别结果：$fish、尺寸参考、鱼获封面已生成。'
-                      : '点一下添加封面，自动生成识别标签和分享卡片。',
-                  style: TextStyle(
-                    color: InkPalette.white.withValues(alpha: 0.72),
-                    fontSize: 11.5.sp,
-                    height: 1.36,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 8.h),
-                Row(
-                  children: [
-                    Icon(
-                      attached
-                          ? Icons.verified_rounded
-                          : Icons.touch_app_rounded,
-                      color: InkPalette.white,
-                      size: 14.w,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return InkCard(
+      padding: EdgeInsets.zero,
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 140.h,
+            child: ListView.separated(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
+              scrollDirection: Axis.horizontal,
+              itemCount: photoPaths.length + 1,
+              separatorBuilder: (_, _) => SizedBox(width: 8.w),
+              itemBuilder: (context, index) {
+                if (index == photoPaths.length) {
+                  return Container(
+                    width: 100.w,
+                    decoration: BoxDecoration(
+                      color: InkPalette.rice.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: InkPalette.line),
                     ),
-                    SizedBox(width: 5.w),
-                    Text(
-                      attached ? '封面可用于发布预览' : '点击模拟选择照片',
-                      style: TextStyle(
-                        color: InkPalette.white,
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.w900,
+                    child: Center(
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: InkPalette.muted,
+                        size: 32.w,
                       ),
                     ),
-                  ],
+                  );
+                }
+                return Container(
+                  width: 140.w,
+                  decoration: BoxDecoration(
+                    color: InkPalette.ink.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(12.r),
+                    image: DecorationImage(
+                      image: FileImage(File(photoPaths[index])),
+                      fit: BoxFit.cover,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: InkPalette.ink.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14.w, 0, 14.w, 14.h),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: InkPalette.ink.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(6.r),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.center_focus_weak_rounded,
+                        color: InkPalette.pine,
+                        size: 14.w,
+                      ),
+                      SizedBox(width: 4.w),
+                      Text(
+                        'AI 已识别: $fish',
+                        style: TextStyle(
+                          color: InkPalette.pine,
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '已选 ${photoPaths.length} 张',
+                  style: TextStyle(
+                    color: InkPalette.muted,
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
             ),

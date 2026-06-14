@@ -5,7 +5,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="江湖钓客 — 山水之间，智钓未来">
+  <meta name="description" content="江湖钓客 - 智能设备与 AI 出钓决策">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <!-- iOS meta tags & icons -->
@@ -25,43 +25,264 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      background-color: #F7F1E5;
+      background:
+        radial-gradient(circle at 28% 18%, rgba(20, 184, 166, 0.14), transparent 30%),
+        radial-gradient(circle at 74% 20%, rgba(37, 99, 235, 0.12), transparent 32%),
+        #0f172a;
       overflow: hidden;
     }
-    /* 确保 Flutter canvas 能正确接收鼠标/触摸事件 */
-    flt-glass-pane {
+    #flutter-host {
+      position: fixed !important;
+      left: 50% !important;
+      top: 50% !important;
+      width: min(390px, 100vw) !important;
+      height: min(844px, calc(100dvh - 40px)) !important;
+      transform: translate(-50%, -50%) !important;
+      overflow: hidden !important;
+      border-radius: 24px;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.36);
+      background: #f6f8fb;
+    }
+    #flutter-host flutter-view,
+    #flutter-host flt-glass-pane {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: inherit;
+      overflow: hidden !important;
       pointer-events: all !important;
     }
-    /* 加载中的占位背景，避免白屏 */
+    @media (max-width: 559px) {
+      html, body {
+        background-color: #f6f8fb;
+        background-image: none;
+      }
+      #flutter-host {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        transform: none !important;
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
     #loading {
       position: fixed;
       inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #F7F1E5;
-      font-family: sans-serif;
-      color: #062F32;
-      font-size: 16px;
+      background:
+        linear-gradient(rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+        radial-gradient(circle at 28% 18%, rgba(20, 184, 166, 0.16), transparent 32%),
+        radial-gradient(circle at 76% 24%, rgba(37, 99, 235, 0.12), transparent 34%),
+        #f6f8fb;
+      background-size: 32px 32px, 32px 32px, 100% 100%, 100% 100%, auto;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      color: #0f172a;
+      z-index: 99999;
+      transition: opacity 0.6s ease;
+    }
+    .device-loader {
+      position: relative;
+      width: 116px;
+      height: 116px;
+      margin-bottom: 24px;
+    }
+    .signal-ring {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(15, 118, 110, 0.22);
+      border-radius: 50%;
+      animation: ring-pulse 1.8s ease-in-out infinite;
+    }
+    .signal-ring.ring-two {
+      inset: 14px;
+      border-color: rgba(37, 99, 235, 0.22);
+      animation-delay: 0.25s;
+    }
+    .signal-ring.ring-three {
+      inset: 28px;
+      border-color: rgba(245, 158, 11, 0.24);
+      animation-delay: 0.5s;
+    }
+    .device-core {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 50px;
+      height: 50px;
+      transform: translate(-50%, -50%);
+      border-radius: 18px;
+      background: linear-gradient(135deg, #0f766e, #2563eb);
+      box-shadow: 0 16px 36px rgba(15, 118, 110, 0.24);
+      animation: core-float 2.2s ease-in-out infinite;
+    }
+    .device-core::before,
+    .device-core::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.88);
+    }
+    .device-core::before {
+      top: 14px;
+      width: 20px;
+      height: 4px;
+    }
+    .device-core::after {
+      top: 24px;
+      width: 28px;
+      height: 4px;
+      opacity: 0.72;
+    }
+    .core-dot {
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f59e0b;
+      transform: translateX(-50%);
+      box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.18);
+    }
+    .sensor-dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #0f766e;
+      box-shadow: 0 0 0 7px rgba(15, 118, 110, 0.12);
+      animation: sensor-blink 1.6s ease-in-out infinite;
+    }
+    .sensor-a { top: 12px; left: 18px; }
+    .sensor-b { right: 10px; top: 40px; animation-delay: 0.25s; }
+    .sensor-c { left: 32px; bottom: 12px; animation-delay: 0.5s; }
+    .sensor-d { right: 26px; bottom: 18px; animation-delay: 0.75s; }
+    .signal-line {
+      position: absolute;
+      height: 2px;
+      width: 34px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.22);
+      transform-origin: center;
+    }
+    .line-a { left: 26px; top: 30px; transform: rotate(34deg); }
+    .line-b { right: 22px; top: 72px; transform: rotate(-28deg); }
+
+    .loading-title {
+      font-size: 27px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 8px;
+      letter-spacing: 0;
+    }
+    .loading-subtitle {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0;
+      color: #475569;
+      opacity: 0;
+      animation: text-fade-in 0.8s ease 0.2s forwards;
+    }
+    .loading-dots {
+      display: flex;
+      gap: 8px;
+      margin-top: 22px;
+    }
+    .loading-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #0f766e;
+      opacity: 0.25;
+      animation: dot-pulse 1.4s ease-in-out infinite;
+    }
+    .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes ring-pulse {
+      0%, 100% { opacity: 0.45; transform: scale(0.94); }
+      50% { opacity: 1; transform: scale(1.03); }
+    }
+    @keyframes core-float {
+      0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+      50% { transform: translate(-50%, -50%) translateY(-4px); }
+    }
+    @keyframes sensor-blink {
+      0%, 100% { opacity: 0.48; transform: scale(0.92); }
+      50% { opacity: 1; transform: scale(1.08); }
+    }
+    @keyframes text-fade-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes dot-pulse {
+      0%, 80%, 100% { opacity: 0.18; transform: scale(1); }
+      40%           { opacity: 0.8; transform: scale(1.5); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .signal-ring,
+      .device-core,
+      .sensor-dot,
+      .loading-dot,
+      .loading-subtitle {
+        animation: none;
+      }
+      .loading-subtitle {
+        opacity: 1;
+      }
     }
   </style>
 </head>
 <body>
   <div id="loading">
-    <span>江湖钓客 · 加载中…</span>
+    <div class="device-loader" aria-hidden="true">
+      <div class="signal-ring"></div>
+      <div class="signal-ring ring-two"></div>
+      <div class="signal-ring ring-three"></div>
+      <div class="signal-line line-a"></div>
+      <div class="signal-line line-b"></div>
+      <span class="sensor-dot sensor-a"></span>
+      <span class="sensor-dot sensor-b"></span>
+      <span class="sensor-dot sensor-c"></span>
+      <span class="sensor-dot sensor-d"></span>
+      <div class="device-core">
+        <div class="core-dot"></div>
+      </div>
+    </div>
+
+    <div class="loading-title">江湖钓客</div>
+    <div class="loading-subtitle">智能设备 · AI 出钓决策</div>
+
+    <div class="loading-dots">
+      <div class="loading-dot"></div>
+      <div class="loading-dot"></div>
+      <div class="loading-dot"></div>
+    </div>
   </div>
-  <script src="flutter_bootstrap.js" async></script>
+
+  <div id="flutter-host"></div>
+
   <script>
-    // 当 Flutter 启动后隐藏加载占位
     window.addEventListener('flutter-first-frame', function() {
       var loading = document.getElementById('loading');
       if (loading) {
         loading.style.opacity = '0';
-        loading.style.transition = 'opacity 0.4s ease';
-        setTimeout(function() { loading.remove(); }, 400);
+        loading.style.transition = 'opacity 0.6s ease';
+        setTimeout(function() { loading.remove(); }, 600);
       }
     });
+
+    var bootstrap = document.createElement('script');
+    bootstrap.src = 'flutter_bootstrap.js?v=' + Date.now();
+    bootstrap.async = true;
+    document.body.appendChild(bootstrap);
   </script>
 </body>
 </html>
-

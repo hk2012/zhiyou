@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
+import '../data/mall_mock_data.dart';
+import '../data/mall_models.dart';
+import 'widgets/mall_home_widgets.dart';
 
 class MallScreen extends StatefulWidget {
   const MallScreen({super.key});
@@ -38,22 +42,27 @@ class _MallScreenState extends State<MallScreen> {
     return total;
   }
 
-  List<_Product> get _visibleProducts {
+  List<MallProduct> get _visibleMallProducts {
     final query = _searchQuery.trim().toLowerCase();
     final activeCategory = _activeCategory.id;
 
-    final matches = _products.where((product) {
-      final categoryMatched = product.categoryId == activeCategory;
-      final queryMatched =
-          query.isEmpty ||
-          product.name.toLowerCase().contains(query) ||
-          product.desc.toLowerCase().contains(query) ||
-          product.tags.any((tag) => tag.toLowerCase().contains(query));
-      return categoryMatched && queryMatched;
+    final matches = mallProducts.where((product) {
+      final categoryMatched = product.category.key == activeCategory;
+      if (query.isEmpty) return categoryMatched;
+      return product.name.toLowerCase().contains(query) ||
+          product.description.toLowerCase().contains(query) ||
+          product.scene.toLowerCase().contains(query) ||
+          product.tags.any((tag) => tag.toLowerCase().contains(query)) ||
+          product.features.any(
+            (feature) => feature.toLowerCase().contains(query),
+          ) ||
+          product.recommendedFor.any(
+            (scene) => scene.toLowerCase().contains(query),
+          );
     }).toList();
 
     if (matches.isNotEmpty || query.isNotEmpty) return matches;
-    return _products.where((product) => product.featured).toList();
+    return mallRecommendedProducts;
   }
 
   int get _cartSubtotal {
@@ -108,6 +117,54 @@ class _MallScreenState extends State<MallScreen> {
       _searchQuery = '';
     });
     AppFeedback.showMessage(context, '已筛选 ${_categories[index].label}');
+  }
+
+  void _selectMallCategory(MallCategoryEntry entry) {
+    final index = _categories.indexWhere((category) => category.id == entry.id);
+    if (index >= 0) _selectCategory(index);
+  }
+
+  void _showMallProduct(MallProduct product) {
+    context.push(
+      '${AppRouteNames.mallProductDetail}?id=${Uri.encodeComponent(product.id)}',
+    );
+  }
+
+  void _openMallCartPage() {
+    context.push(AppRouteNames.mallCart);
+  }
+
+  void _openMallCheckoutPage() {
+    context.push(AppRouteNames.mallCheckout);
+  }
+
+  void _addMallProduct(MallProduct product) {
+    final item = _productById(product.id);
+    if (item == null) return;
+    _addToCart(item);
+  }
+
+  void _toggleMallProductFavorite(MallProduct product) {
+    final item = _productById(product.id);
+    if (item == null) return;
+    _toggleFavorite(item);
+  }
+
+  void _addScenarioPackageToCart(MallScenarioPackage package) {
+    var addedCount = 0;
+    setState(() {
+      for (final item in package.items) {
+        if (item.productId.isEmpty) continue;
+        final product = _productById(item.productId);
+        if (product == null) continue;
+        _cart[product.id] = (_cart[product.id] ?? 0) + item.quantity;
+        addedCount += item.quantity;
+      }
+    });
+    AppFeedback.showMessage(
+      context,
+      addedCount == 0 ? '该套餐暂不可加入购物车' : '${package.name} 已加入购物车',
+    );
   }
 
   void _addToCart(_Product product, {int quantity = 1, bool toast = true}) {
@@ -192,9 +249,6 @@ class _MallScreenState extends State<MallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedCategory = _activeCategory;
-    final visibleProducts = _visibleProducts;
-
     return InkPage(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -205,8 +259,8 @@ class _MallScreenState extends State<MallScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             InkTopBar(
-              title: '商城服务',
-              subtitle: '会员权益 · 装备组合 · 结算闭环',
+              title: '智能装备商城',
+              subtitle: '设备生态 · 场景方案 · 会员权益',
               onBack: () => context.pop(),
               actions: [
                 InkRoundButton(
@@ -216,180 +270,91 @@ class _MallScreenState extends State<MallScreen> {
                 ),
               ],
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
-              child: InkSearchBox(
-                hint: _searchQuery.isEmpty
-                    ? '搜索鱼竿、鱼轮、饵料、向导服务'
-                    : '搜索：$_searchQuery',
-                onTap: _showMallSearchSheet,
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 0),
-              child: _MallMemberCard(
-                cartCount: _cartCount,
-                favoriteCount: _favoriteProducts.length,
-                onTap: _showMemberSheet,
-                onCartTap: _showCartSheet,
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 0),
-              child: InkPressable(
-                onTap: _showGearComboSheet,
-                child: InkLandscapeHero(
-                  height: 156,
-                  title: '钓无界 趣无穷',
-                  subtitle: 'AI 根据今日鱼情推荐装备组合，减少试错。',
-                  trailing: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 12.w,
-                      vertical: 8.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: InkPalette.white.withValues(alpha: 0.82),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '去看看',
-                      style: TextStyle(
-                        color: InkPalette.pine,
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const InkSectionHeader(title: '服务分类', subtitle: '装备、租赁、向导、售后'),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18.w),
-              child: InkCard(
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _categories.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 14.h,
-                    crossAxisSpacing: 8.w,
-                    childAspectRatio: 0.88,
-                  ),
-                  itemBuilder: (context, index) {
-                    final item = _categories[index];
-                    return _CategoryTile(
-                      category: item,
-                      selected: index == _selectedCategory,
-                      count: _products
-                          .where((product) => product.categoryId == item.id)
-                          .length,
-                      onTap: () => _selectCategory(index),
-                    );
-                  },
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 0),
-              child: _CouponCheckoutCard(
-                subtotal: _cartSubtotal,
-                couponDiscount: _couponDiscount,
-                pointsDiscount: _pointsDiscount,
-                payable: _payableAmount,
-                onTap: _showCheckoutSheet,
-              ),
-            ),
-            InkSectionHeader(
-              title: '智能推荐',
-              subtitle: _searchQuery.isEmpty
-                  ? '当前分类：${selectedCategory.label} · 适配今日鱼情'
-                  : '当前分类：${selectedCategory.label} · 搜索 $_searchQuery',
-              action: '全部',
-              onAction: _showAllProductsSheet,
-            ),
-            if (visibleProducts.isEmpty)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18.w),
-                child: _MallEmptyResult(
-                  query: _searchQuery,
-                  onClear: () => setState(() => _searchQuery = ''),
-                ),
-              )
-            else
-              SizedBox(
-                height: 228.h,
-                child: ListView.separated(
-                  padding: EdgeInsets.symmetric(horizontal: 18.w),
-                  physics: const BouncingScrollPhysics(),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: visibleProducts.length,
-                  separatorBuilder: (_, _) => SizedBox(width: 12.w),
-                  itemBuilder: (context, index) {
-                    final product = visibleProducts[index];
-                    return _ProductCard(
-                      product: product,
-                      quantity: _cart[product.id] ?? 0,
-                      favorite: _favoriteProducts.contains(product.id),
-                      onTap: () => _showProductSheet(product),
-                      onFavorite: () => _toggleFavorite(product),
-                      onAdd: () => _addToCart(product),
-                    );
-                  },
-                ),
-              ),
-            const InkSectionHeader(title: '服务与订单', subtitle: '购买、预约、售后进度'),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18.w),
-              child: Column(
-                children: [
-                  InkCard(
-                    padding: EdgeInsets.all(13.r),
-                    onTap: _showOrdersSheet,
-                    child: InkInfoRow(
-                      icon: Icons.receipt_long_rounded,
-                      title: '我的订单',
-                      subtitle:
-                          '待付款 $_pendingOrders · 待发货 $_shippingOrders · 售后 $_afterSaleOrders',
-                      trailing: '查看',
-                      color: InkPalette.pine,
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                  InkCard(
-                    padding: EdgeInsets.all(13.r),
-                    onTap: _showRentalSheet,
-                    child: InkInfoRow(
-                      icon: Icons.local_shipping_rounded,
-                      title: '本地租赁服务',
-                      subtitle: _rentalReserved
-                          ? '已预约明日 09:00 取还装备'
-                          : '可预约鱼竿、探鱼器、露营装备',
-                      trailing: _rentalReserved ? '已预约' : '预约',
-                      color: InkPalette.lake,
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                  InkCard(
-                    padding: EdgeInsets.all(13.r),
-                    onTap: _showAfterSaleSheet,
-                    child: InkInfoRow(
-                      icon: Icons.support_agent_rounded,
-                      title: '售后管家',
-                      subtitle: _hasNewAfterSale
-                          ? '已创建保养工单，客服待确认'
-                          : '保养、维修、退换和押金退还',
-                      trailing: _hasNewAfterSale ? '处理中' : '发起',
-                      color: InkPalette.reed,
-                    ),
-                  ),
-                ],
-              ),
+            MallHome(
+              searchText: _searchQuery,
+              cartCount: _cartCount,
+              favoriteIds: _favoriteProducts,
+              cartQuantities: _cart,
+              categories: mallCategoryEntries,
+              activeCategoryId: _activeCategory.id,
+              smartDevices: mallCoreSmartDeviceProducts,
+              scenarioPackages: mallScenarioPackages,
+              memberProducts: mallMemberPackageProducts,
+              venueProducts: mallFishingVenueProducts,
+              accessoryProducts: mallAccessoryProducts,
+              hotProducts: mallHotProducts,
+              recommendedProducts: mallRecommendedProducts,
+              searchResults: _visibleMallProducts,
+              checkoutSummary: _buildCheckoutSummary(),
+              serviceSummary: _buildServiceSummary(),
+              onSearchTap: _showMallSearchSheet,
+              onCartTap: _openMallCartPage,
+              onCategoryTap: _selectMallCategory,
+              onBannerTap: _showGearComboSheet,
+              onProductTap: _showMallProduct,
+              onProductAdd: _addMallProduct,
+              onProductFavorite: _toggleMallProductFavorite,
+              onScenarioTap: _showScenarioPackageSheet,
+              onScenarioBuy: _addScenarioPackageToCart,
+              onMemberTap: _showMemberSheet,
+              onAllProductsTap: _showAllProductsSheet,
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCheckoutSummary() {
+    return _CouponCheckoutCard(
+      subtotal: _cartSubtotal,
+      couponDiscount: _couponDiscount,
+      pointsDiscount: _pointsDiscount,
+      payable: _payableAmount,
+      onTap: _openMallCheckoutPage,
+    );
+  }
+
+  Widget _buildServiceSummary() {
+    return Column(
+      children: [
+        InkCard(
+          padding: EdgeInsets.all(13.r),
+          onTap: _showOrdersSheet,
+          child: InkInfoRow(
+            icon: Icons.receipt_long_rounded,
+            title: '我的订单',
+            subtitle:
+                '待付款 $_pendingOrders · 待发货 $_shippingOrders · 售后 $_afterSaleOrders',
+            trailing: '查看',
+            color: InkPalette.pine,
+          ),
+        ),
+        SizedBox(height: 12.h),
+        InkCard(
+          padding: EdgeInsets.all(13.r),
+          onTap: _showRentalSheet,
+          child: InkInfoRow(
+            icon: Icons.local_shipping_rounded,
+            title: '本地租赁服务',
+            subtitle: _rentalReserved ? '已预约明日 09:00 取还装备' : '可预约探鱼器、智能设备和钓场装备',
+            trailing: _rentalReserved ? '已预约' : '预约',
+            color: InkPalette.lake,
+          ),
+        ),
+        SizedBox(height: 12.h),
+        InkCard(
+          padding: EdgeInsets.all(13.r),
+          onTap: _showAfterSaleSheet,
+          child: InkInfoRow(
+            icon: Icons.support_agent_rounded,
+            title: '售后管家',
+            subtitle: _hasNewAfterSale ? '已创建保养工单，客服待确认' : '设备保修、维修、退换和押金退还',
+            trailing: _hasNewAfterSale ? '处理中' : '发起',
+            color: InkPalette.reed,
+          ),
+        ),
+      ],
     );
   }
 
@@ -431,8 +396,8 @@ class _MallScreenState extends State<MallScreen> {
 
     showInkActionSheet(
       context,
-      title: 'AI 装备组合',
-      subtitle: '轻量路亚竿 + 浅水纺车轮 + 浮水米诺，适合清晨浅水搜索',
+      title: '智能装备组合',
+      subtitle: '智能鱼漂 + 夜钓灯 + 鱼漂电池仓套件，适合夜钓和轻口提醒',
       icon: Icons.auto_awesome_rounded,
       color: InkPalette.pine,
       showLandscape: true,
@@ -468,19 +433,97 @@ class _MallScreenState extends State<MallScreen> {
         InkSheetAction(
           icon: Icons.add_shopping_cart_rounded,
           title: '一键加入购物车',
-          subtitle: '加入竿、轮、饵三件组合',
+          subtitle: '加入智能鱼漂、夜钓灯和设备配件',
           color: InkPalette.pine,
           onTap: _addGearCombo,
         ),
         InkSheetAction(
           icon: Icons.tune_rounded,
-          title: '按预算替换装备',
-          subtitle: '切到配件分类，手动挑选更经济组合',
+          title: '查看设备配件',
+          subtitle: '切到配件分类，补齐电池仓、支架和耗材',
           color: InkPalette.lake,
           onTap: () {
-            final index = _categories.indexWhere((item) => item.id == 'gear');
+            final index = _categories.indexWhere(
+              (item) => item.id == 'accessory',
+            );
             if (index >= 0) _selectCategory(index);
           },
+        ),
+      ],
+    );
+  }
+
+  void _showScenarioPackageSheet(MallScenarioPackage package) {
+    final packageProducts = package.items
+        .map((item) => item.productId)
+        .where((id) => id.isNotEmpty)
+        .map(_productById)
+        .whereType<_Product>()
+        .toList();
+
+    showInkActionSheet(
+      context,
+      title: package.name,
+      subtitle: '${package.scene} · 会员价 ¥${package.memberPrice}',
+      icon: Icons.inventory_2_rounded,
+      color: InkPalette.pine,
+      showLandscape: true,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: InkMetric(
+                value: '¥${package.packagePrice}',
+                label: '套餐价',
+                icon: Icons.shopping_bag_rounded,
+                color: InkPalette.pine,
+              ),
+            ),
+            SizedBox(width: 8.w),
+            Expanded(
+              child: InkMetric(
+                value: '省${package.savingAmount}',
+                label: '组合优惠',
+                icon: Icons.confirmation_number_rounded,
+                color: InkPalette.cinnabar,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10.h),
+        InkCard(
+          padding: EdgeInsets.all(12.r),
+          color: InkPalette.paper.withValues(alpha: 0.72),
+          child: Text(
+            package.mainBenefit,
+            style: TextStyle(
+              color: InkPalette.text,
+              fontSize: 13.sp,
+              height: 1.42,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        SizedBox(height: 10.h),
+        for (final product in packageProducts) ...[
+          _SheetMiniProduct(product: product),
+          SizedBox(height: 8.h),
+        ],
+      ],
+      actions: [
+        InkSheetAction(
+          icon: Icons.add_shopping_cart_rounded,
+          title: '加入套餐商品',
+          subtitle: '按套餐清单加入购物车，结算时使用优惠券',
+          color: InkPalette.pine,
+          onTap: () => _addScenarioPackageToCart(package),
+        ),
+        InkSheetAction(
+          icon: Icons.workspace_premium_rounded,
+          title: '查看会员价',
+          subtitle: 'Pro 会员可享 ¥${package.memberPrice} 组合价',
+          color: InkPalette.reed,
+          onTap: _showMemberSheet,
         ),
       ],
     );
@@ -559,15 +602,15 @@ class _MallScreenState extends State<MallScreen> {
         actions: [
           InkSheetAction(
             icon: Icons.auto_awesome_rounded,
-            title: '加入 AI 装备组合',
-            subtitle: '竿、轮、饵三件组合，适合今日鱼情',
+            title: '加入智能装备组合',
+            subtitle: '智能鱼漂、夜钓灯和设备配件，适合今日鱼情',
             color: InkPalette.pine,
             onTap: _addGearCombo,
           ),
           InkSheetAction(
             icon: Icons.storefront_rounded,
             title: '浏览全部商品',
-            subtitle: '装备、租赁、向导和售后服务',
+            subtitle: '智能设备、场景套餐、配件和会员权益',
             color: InkPalette.lake,
             onTap: _showAllProductsSheet,
           ),
@@ -747,8 +790,8 @@ class _MallScreenState extends State<MallScreen> {
       actions: [
         InkSheetAction(
           icon: Icons.payments_rounded,
-          title: '模拟支付待付款',
-          subtitle: '前端演示：待付款转为待发货',
+          title: '支付待付款',
+          subtitle: '确认订单金额、优惠和配送方式后进入待发货',
           color: InkPalette.pine,
           onTap: () {
             if (_pendingOrders == 0) {
@@ -822,7 +865,7 @@ class _MallScreenState extends State<MallScreen> {
           subtitle: '押金、归还和数据清除流程可在结算中确认',
           color: InkPalette.moss,
           onTap: () {
-            final product = _productById('device-finder-rent');
+            final product = _productById('fish-finder-sonar-pro');
             if (product != null) _addToCart(product);
           },
         ),
@@ -834,7 +877,7 @@ class _MallScreenState extends State<MallScreen> {
     showInkActionSheet(
       context,
       title: '售后管家',
-      subtitle: '保养、维修、退换和押金退还，先做前端工单流转',
+      subtitle: '保养、维修、退换和押金退还统一在这里处理',
       icon: Icons.support_agent_rounded,
       color: InkPalette.reed,
       children: [
@@ -877,228 +920,11 @@ class _MallScreenState extends State<MallScreen> {
         InkSheetAction(
           icon: Icons.assignment_return_rounded,
           title: '退换 / 押金退还',
-          subtitle: '前端先展示规则和节点，后续接后台',
+          subtitle: '查看退换规则、押金节点和预计到账时间',
           color: InkPalette.lake,
           onTap: () => AppFeedback.showMessage(context, '已打开退换规则'),
         ),
       ],
-    );
-  }
-}
-
-class _MallMemberCard extends StatelessWidget {
-  const _MallMemberCard({
-    required this.cartCount,
-    required this.favoriteCount,
-    required this.onTap,
-    required this.onCartTap,
-  });
-
-  final int cartCount;
-  final int favoriteCount;
-  final VoidCallback onTap;
-  final VoidCallback onCartTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkCard(
-      padding: EdgeInsets.all(14.r),
-      onTap: onTap,
-      color: InkPalette.ink.withValues(alpha: 0.88),
-      borderColor: InkPalette.reed.withValues(alpha: 0.42),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const InkSeal(text: '会\n员'),
-              SizedBox(width: 10.w),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '江湖钓客会员',
-                      style: TextStyle(
-                        color: InkPalette.white,
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w900,
-                        fontFamilyFallback: brushFontFallback,
-                      ),
-                    ),
-                    SizedBox(height: 3.h),
-                    Text(
-                      '积分 $_memberPoints · 优惠券 ${_coupons.length} 张 · 同城租赁免押',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: InkPalette.white.withValues(alpha: 0.72),
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              InkChip(
-                label: cartCount == 0 ? '购物车' : '购物车 $cartCount',
-                active: true,
-                color: InkPalette.reed,
-                onTap: onCartTap,
-              ),
-            ],
-          ),
-          SizedBox(height: 12.h),
-          Row(
-            children: [
-              const Expanded(
-                child: _MemberMetric(value: '95折', label: '装备'),
-              ),
-              SizedBox(width: 8.w),
-              const Expanded(
-                child: _MemberMetric(value: '免押', label: '租赁'),
-              ),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: _MemberMetric(
-                  value: favoriteCount == 0 ? '优先' : '$favoriteCount藏',
-                  label: '售后',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MemberMetric extends StatelessWidget {
-  const _MemberMetric({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 9.h),
-      decoration: BoxDecoration(
-        color: InkPalette.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14.r),
-        border: Border.all(color: InkPalette.white.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: InkPalette.reed,
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              color: InkPalette.white.withValues(alpha: 0.90),
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({
-    required this.category,
-    required this.selected,
-    required this.count,
-    required this.onTap,
-  });
-
-  final _MallCategory category;
-  final bool selected;
-  final int count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkPressable(
-      onTap: onTap,
-      child: Column(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 44.w,
-            height: 44.w,
-            decoration: BoxDecoration(
-              color: selected
-                  ? category.color
-                  : category.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(15.r),
-              border: Border.all(
-                color: selected
-                    ? category.color
-                    : category.color.withValues(alpha: 0.2),
-              ),
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Center(
-                  child: Icon(
-                    category.icon,
-                    color: selected ? InkPalette.white : category.color,
-                    size: 22.w,
-                  ),
-                ),
-                Positioned(
-                  right: -3.w,
-                  top: -4.h,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 4.w,
-                      vertical: 1.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected ? InkPalette.reed : InkPalette.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: selected
-                            ? InkPalette.reed
-                            : category.color.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: Text(
-                      '$count',
-                      style: TextStyle(
-                        color: selected ? InkPalette.ink : category.color,
-                        fontSize: 9.5.sp,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 6.h),
-          Text(
-            category.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: selected ? category.color : InkPalette.text,
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1165,202 +991,6 @@ class _CouponCheckoutCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProductCard extends StatelessWidget {
-  const _ProductCard({
-    required this.product,
-    required this.quantity,
-    required this.favorite,
-    required this.onTap,
-    required this.onFavorite,
-    required this.onAdd,
-  });
-
-  final _Product product;
-  final int quantity;
-  final bool favorite;
-  final VoidCallback onTap;
-  final VoidCallback onFavorite;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 154.w,
-      child: InkCard(
-        padding: EdgeInsets.all(10.r),
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: product.color.withValues(alpha: 0.13),
-                      borderRadius: BorderRadius.circular(15.r),
-                    ),
-                    child: Icon(product.icon, color: product.color, size: 44.w),
-                  ),
-                  Positioned(
-                    left: 7.w,
-                    top: 7.h,
-                    child: _TinyBadge(
-                      label: product.badge,
-                      color: product.color,
-                    ),
-                  ),
-                  if (quantity > 0)
-                    Positioned(
-                      left: 7.w,
-                      bottom: 7.h,
-                      child: _TinyBadge(
-                        label: '已加 $quantity',
-                        color: InkPalette.cinnabar,
-                      ),
-                    ),
-                  Positioned(
-                    right: 6.w,
-                    top: 6.h,
-                    child: InkPressable(
-                      onTap: onFavorite,
-                      child: Container(
-                        width: 28.w,
-                        height: 28.w,
-                        decoration: BoxDecoration(
-                          color: InkPalette.white.withValues(alpha: 0.82),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          favorite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          color: favorite
-                              ? InkPalette.cinnabar
-                              : InkPalette.muted,
-                          size: 17.w,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 10.h),
-            Text(
-              product.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: InkPalette.text,
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            SizedBox(height: 5.h),
-            Text(
-              product.desc,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: InkPalette.muted,
-                fontSize: 11.sp,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(height: 6.h),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '¥${product.price}${product.unit}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: InkPalette.cinnabar,
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                InkPressable(
-                  onTap: onAdd,
-                  child: Container(
-                    width: 28.w,
-                    height: 28.w,
-                    decoration: const BoxDecoration(
-                      color: InkPalette.pine,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.add_shopping_cart_rounded,
-                      color: InkPalette.white,
-                      size: 16.w,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MallEmptyResult extends StatelessWidget {
-  const _MallEmptyResult({required this.query, required this.onClear});
-
-  final String query;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkCard(
-      padding: EdgeInsets.all(18.r),
-      child: Column(
-        children: [
-          InkIconMark(
-            icon: Icons.search_off_rounded,
-            color: InkPalette.muted,
-            size: 48,
-            iconSize: 24,
-          ),
-          SizedBox(height: 10.h),
-          Text(
-            '没有找到「$query」',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: InkPalette.text,
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: 6.h),
-          Text(
-            '可以换个关键词，或者清空搜索继续浏览当前分类。',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: InkPalette.muted,
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          SizedBox(height: 14.h),
-          InkPrimaryButton(
-            label: '清空搜索',
-            icon: Icons.close_rounded,
-            onTap: onClear,
-            color: InkPalette.pine,
           ),
         ],
       ),
@@ -2663,6 +2293,15 @@ class _MallCategory {
     required this.color,
   });
 
+  factory _MallCategory.fromEntry(MallCategoryEntry entry) {
+    return _MallCategory(
+      id: entry.id,
+      icon: _iconForCategory(entry.category),
+      label: entry.label,
+      color: _colorForCategory(entry.category),
+    );
+  }
+
   final String id;
   final IconData icon;
   final String label;
@@ -2685,7 +2324,64 @@ class _Product {
     required this.tags,
     this.unit = '',
     this.featured = false,
+    this.memberPrice = 0,
+    this.originalPrice = 0,
+    this.sales = 0,
+    this.scene = '',
+    this.deviceCompatible = const [],
+    this.features = const [],
+    this.stock = 0,
+    this.isSmartDevice = false,
+    this.isPackage = false,
+    this.packageItems = const [],
+    this.supportMembershipDiscount = false,
+    this.supportDeviceLink = false,
+    this.recommendedFor = const [],
   });
+
+  factory _Product.fromMallProduct(MallProduct product) {
+    final noteParts = [
+      if (product.description.isNotEmpty) product.description,
+      if (product.features.isNotEmpty)
+        '核心功能：${product.features.take(3).join(' / ')}',
+      if (product.deviceCompatible.isNotEmpty)
+        '适配：${product.deviceCompatible.take(3).join('、')}',
+    ];
+
+    return _Product(
+      id: product.id,
+      categoryId: product.category.key,
+      name: product.name,
+      desc: product.description.isNotEmpty
+          ? product.description
+          : '${product.scene} · ${product.tags.take(2).join(' · ')}',
+      note: noteParts.join('\n'),
+      price: product.price,
+      icon: _iconForCategory(product.category),
+      color: _colorForCategory(product.category),
+      badge: product.badge.isEmpty ? product.category.label : product.badge,
+      delivery: _deliveryForProduct(product),
+      rating: product.rating,
+      tags: product.tags,
+      unit: product.category == MallProductCategory.membership ? '/年' : '',
+      featured:
+          mallRecommendedProductIds.contains(product.id) ||
+          product.isSmartDevice,
+      memberPrice: product.memberPrice,
+      originalPrice: product.originalPrice,
+      sales: product.sales,
+      scene: product.scene,
+      deviceCompatible: product.deviceCompatible,
+      features: product.features,
+      stock: product.stock,
+      isSmartDevice: product.isSmartDevice,
+      isPackage: product.isPackage,
+      packageItems: product.packageItems.map((item) => item.name).toList(),
+      supportMembershipDiscount: product.supportMembershipDiscount,
+      supportDeviceLink: product.supportDeviceLink,
+      recommendedFor: product.recommendedFor,
+    );
+  }
 
   final String id;
   final String categoryId;
@@ -2701,6 +2397,19 @@ class _Product {
   final List<String> tags;
   final String unit;
   final bool featured;
+  final int memberPrice;
+  final int originalPrice;
+  final int sales;
+  final String scene;
+  final List<String> deviceCompatible;
+  final List<String> features;
+  final int stock;
+  final bool isSmartDevice;
+  final bool isPackage;
+  final List<String> packageItems;
+  final bool supportMembershipDiscount;
+  final bool supportDeviceLink;
+  final List<String> recommendedFor;
 }
 
 class _Coupon {
@@ -2711,6 +2420,16 @@ class _Coupon {
     required this.amount,
     required this.threshold,
   });
+
+  factory _Coupon.fromMallCoupon(MallCoupon coupon) {
+    return _Coupon(
+      id: coupon.id,
+      title: coupon.title,
+      subtitle: coupon.description,
+      amount: coupon.amount,
+      threshold: coupon.threshold,
+    );
+  }
 
   final String id;
   final String title;
@@ -2733,6 +2452,72 @@ _Product? _productById(String id) {
   return null;
 }
 
+IconData _iconForCategory(MallProductCategory category) {
+  switch (category) {
+    case MallProductCategory.smartDevice:
+      return Icons.settings_input_antenna_rounded;
+    case MallProductCategory.smartFloat:
+      return Icons.water_drop_rounded;
+    case MallProductCategory.smartTackleBox:
+      return Icons.inventory_2_rounded;
+    case MallProductCategory.smartPlatform:
+      return Icons.dashboard_customize_rounded;
+    case MallProductCategory.smartUmbrella:
+      return Icons.beach_access_rounded;
+    case MallProductCategory.fishFinder:
+      return Icons.sensors_rounded;
+    case MallProductCategory.nightLight:
+      return Icons.lightbulb_rounded;
+    case MallProductCategory.bait:
+      return Icons.grain_rounded;
+    case MallProductCategory.rod:
+      return Icons.phishing_rounded;
+    case MallProductCategory.fishingLine:
+      return Icons.cable_rounded;
+    case MallProductCategory.accessory:
+      return Icons.build_rounded;
+    case MallProductCategory.membership:
+      return Icons.workspace_premium_rounded;
+    case MallProductCategory.fishingVenue:
+      return Icons.location_on_rounded;
+    case MallProductCategory.sensor:
+      return Icons.thermostat_rounded;
+    case MallProductCategory.oxygen:
+      return Icons.air_rounded;
+  }
+}
+
+Color _colorForCategory(MallProductCategory category) {
+  switch (category) {
+    case MallProductCategory.smartDevice:
+    case MallProductCategory.smartFloat:
+    case MallProductCategory.fishFinder:
+    case MallProductCategory.sensor:
+      return InkPalette.lake;
+    case MallProductCategory.smartTackleBox:
+    case MallProductCategory.smartPlatform:
+    case MallProductCategory.smartUmbrella:
+    case MallProductCategory.nightLight:
+    case MallProductCategory.oxygen:
+      return InkPalette.moss;
+    case MallProductCategory.bait:
+    case MallProductCategory.accessory:
+    case MallProductCategory.fishingLine:
+      return InkPalette.reed;
+    case MallProductCategory.rod:
+    case MallProductCategory.membership:
+    case MallProductCategory.fishingVenue:
+      return InkPalette.pine;
+  }
+}
+
+String _deliveryForProduct(MallProduct product) {
+  if (product.category == MallProductCategory.membership) return '立即';
+  if (product.category == MallProductCategory.fishingVenue) return '预约';
+  if (product.isSmartDevice) return product.stock > 120 ? '24h' : '48h';
+  return product.stock > 500 ? '24h' : '48h';
+}
+
 _Coupon? _bestCouponForSubtotal(int subtotal) {
   _Coupon? best;
   for (final coupon in _coupons) {
@@ -2742,320 +2527,18 @@ _Coupon? _bestCouponForSubtotal(int subtotal) {
   return best;
 }
 
-const _memberPoints = 2680;
+const _memberPoints = mallMemberPoints;
 
-const _gearComboProductIds = [
-  'rod-stream-lure',
-  'reel-shallow-3000',
-  'bait-minnow-95',
-];
+const _gearComboProductIds = mallSmartGearComboProductIds;
 
-const _categories = [
-  _MallCategory(
-    id: 'rod',
-    icon: Icons.phishing_rounded,
-    label: '鱼竿',
-    color: InkPalette.pine,
-  ),
-  _MallCategory(
-    id: 'reel',
-    icon: Icons.adjust_rounded,
-    label: '鱼轮',
-    color: InkPalette.lake,
-  ),
-  _MallCategory(
-    id: 'bait',
-    icon: Icons.grain_rounded,
-    label: '饵料',
-    color: InkPalette.reed,
-  ),
-  _MallCategory(
-    id: 'parts',
-    icon: Icons.build_rounded,
-    label: '配件',
-    color: InkPalette.moss,
-  ),
-  _MallCategory(
-    id: 'gear',
-    icon: Icons.backpack_rounded,
-    label: '装备',
-    color: InkPalette.pine,
-  ),
-  _MallCategory(
-    id: 'guide',
-    icon: Icons.map_rounded,
-    label: '向导',
-    color: InkPalette.lake,
-  ),
-  _MallCategory(
-    id: 'device',
-    icon: Icons.sensors_rounded,
-    label: '设备',
-    color: InkPalette.moss,
-  ),
-  _MallCategory(
-    id: 'service',
-    icon: Icons.support_agent_rounded,
-    label: '售后',
-    color: InkPalette.reed,
-  ),
-];
+final _categories = mallCategoryEntries
+    .map(_MallCategory.fromEntry)
+    .toList(growable: false);
 
-const _coupons = [
-  _Coupon(
-    id: 'gear80',
-    title: '装备满 899 减 80',
-    subtitle: '鱼竿、鱼轮、装备组合可用',
-    amount: 80,
-    threshold: 899,
-  ),
-  _Coupon(
-    id: 'service30',
-    title: '服务满 299 减 30',
-    subtitle: '向导、租赁和保养服务可用',
-    amount: 30,
-    threshold: 299,
-  ),
-  _Coupon(
-    id: 'combo120',
-    title: '组合满 1299 减 120',
-    subtitle: '跨分类组合结算可用',
-    amount: 120,
-    threshold: 1299,
-  ),
-];
+final _coupons = mallCoupons
+    .map(_Coupon.fromMallCoupon)
+    .toList(growable: false);
 
-const _products = [
-  _Product(
-    id: 'rod-stream-lure',
-    categoryId: 'rod',
-    name: '溪流路亚竿 1.54m',
-    desc: '轻量碳素 · 适合翘嘴',
-    note: '短节溪流路亚竿，适合城市河道、浅滩和小型水库搜索。手把轻，长时间抛投更省力。',
-    price: 599,
-    icon: Icons.phishing_rounded,
-    color: InkPalette.pine,
-    badge: '热卖',
-    delivery: '24h',
-    rating: 4.9,
-    tags: ['轻量', '翘嘴', '鳜鱼', '路亚'],
-    featured: true,
-  ),
-  _Product(
-    id: 'rod-tai-fishing',
-    categoryId: 'rod',
-    name: '湖库台钓竿 4.5m',
-    desc: '腰力稳定 · 新手友好',
-    note: '兼顾湖库与野河的入门台钓竿，配重平衡，适合鲫鱼、鲤鱼和综合鱼情。',
-    price: 329,
-    icon: Icons.phishing_rounded,
-    color: InkPalette.pine,
-    badge: '入门',
-    delivery: '48h',
-    rating: 4.7,
-    tags: ['台钓', '鲫鱼', '湖库', '新手'],
-  ),
-  _Product(
-    id: 'reel-shallow-3000',
-    categoryId: 'reel',
-    name: '浅水纺车轮 3000',
-    desc: '顺滑泄力 · 防腐蚀',
-    note: '轻量纺车轮，泄力顺滑，适合浅水搜索与中小型目标鱼。金属线杯兼容 PE 线。',
-    price: 399,
-    icon: Icons.adjust_rounded,
-    color: InkPalette.lake,
-    badge: '推荐',
-    delivery: '24h',
-    rating: 4.8,
-    tags: ['纺车轮', '防腐蚀', '路亚', '浅水'],
-    featured: true,
-  ),
-  _Product(
-    id: 'reel-baitcaster-lite',
-    categoryId: 'reel',
-    name: '微物水滴轮 BFS',
-    desc: '轻饵启动 · 磁力刹车',
-    note: '适合 2-7g 轻饵抛投，刹车调节直观，帮助进阶玩家拓展微物玩法。',
-    price: 529,
-    icon: Icons.adjust_rounded,
-    color: InkPalette.lake,
-    badge: '进阶',
-    delivery: '48h',
-    rating: 4.7,
-    tags: ['微物', '水滴轮', '轻饵', '路亚'],
-  ),
-  _Product(
-    id: 'bait-minnow-95',
-    categoryId: 'bait',
-    name: '浮水米诺 9.5cm',
-    desc: '浅区搜索 · 高反光',
-    note: '浮水米诺适合晨昏浅水搜索，慢收有摆动，停顿上浮可避开水草。',
-    price: 59,
-    icon: Icons.set_meal_rounded,
-    color: InkPalette.reed,
-    badge: '高频',
-    delivery: '24h',
-    rating: 4.6,
-    tags: ['米诺', '浅区', '翘嘴', '浮水'],
-    featured: true,
-  ),
-  _Product(
-    id: 'bait-summer-groundbait',
-    categoryId: 'bait',
-    name: '夏季腥香窝料',
-    desc: '快速聚鱼 · 野钓适配',
-    note: '颗粒与粉料混合，适合夏季野河和水库守钓。建议少量多次补窝。',
-    price: 39,
-    icon: Icons.grain_rounded,
-    color: InkPalette.reed,
-    badge: '补货',
-    delivery: '24h',
-    rating: 4.5,
-    tags: ['窝料', '鲫鱼', '鲤鱼', '野钓'],
-  ),
-  _Product(
-    id: 'parts-pe-leader',
-    categoryId: 'parts',
-    name: 'PE线 + 前导套装',
-    desc: '8编主线 · 碳素前导',
-    note: '主线和前导线一次配齐，适合路亚入门组合。附绑结卡片，减少现场试错。',
-    price: 89,
-    icon: Icons.cable_rounded,
-    color: InkPalette.moss,
-    badge: '套装',
-    delivery: '24h',
-    rating: 4.8,
-    tags: ['PE线', '前导', '线组', '配件'],
-  ),
-  _Product(
-    id: 'parts-waterproof-bag',
-    categoryId: 'parts',
-    name: '防水鱼护包',
-    desc: '可折叠 · 易清洗',
-    note: '适合短途野钓和城市岸钓，内层防水易冲洗，收纳后不占后备箱空间。',
-    price: 129,
-    icon: Icons.shopping_bag_rounded,
-    color: InkPalette.moss,
-    badge: '实用',
-    delivery: '48h',
-    rating: 4.6,
-    tags: ['收纳', '鱼护', '防水', '配件'],
-  ),
-  _Product(
-    id: 'gear-light-box',
-    categoryId: 'gear',
-    name: '轻量钓箱 26L',
-    desc: '坐钓稳定 · 配件位齐',
-    note: '26L 轻量钓箱，适合半日出钓。杯架、炮台和伞架接口齐全。',
-    price: 299,
-    icon: Icons.backpack_rounded,
-    color: InkPalette.pine,
-    badge: '轻装',
-    delivery: '48h',
-    rating: 4.7,
-    tags: ['钓箱', '收纳', '台钓', '装备'],
-  ),
-  _Product(
-    id: 'gear-sun-rain',
-    categoryId: 'gear',
-    name: '防晒雨披套装',
-    desc: '速干透气 · 防小雨',
-    note: '适合夏季岸边长时间等待，帽檐和袖口有防晒设计，小雨也能继续作钓。',
-    price: 169,
-    icon: Icons.umbrella_rounded,
-    color: InkPalette.pine,
-    badge: '夏季',
-    delivery: '24h',
-    rating: 4.5,
-    tags: ['防晒', '雨披', '速干', '装备'],
-  ),
-  _Product(
-    id: 'guide-west-lake-morning',
-    categoryId: 'guide',
-    name: '西湖晨钓向导',
-    desc: '3小时带钓 · 路线规划',
-    note: '本地向导提供合法水域建议、停车点、岸边路线和基础装备调试。',
-    price: 199,
-    icon: Icons.map_rounded,
-    color: InkPalette.lake,
-    badge: '同城',
-    delivery: '预约',
-    rating: 4.9,
-    tags: ['向导', '西湖', '晨钓', '带钓'],
-    unit: '/次',
-  ),
-  _Product(
-    id: 'guide-xiang-lake-night',
-    categoryId: 'guide',
-    name: '湘湖夜钓向导',
-    desc: '安全点位 · 夜间提醒',
-    note: '夜钓向导侧重安全路线、照明建议和收竿节点，适合新手体验。',
-    price: 259,
-    icon: Icons.route_rounded,
-    color: InkPalette.lake,
-    badge: '夜钓',
-    delivery: '预约',
-    rating: 4.8,
-    tags: ['向导', '湘湖', '夜钓', '安全'],
-    unit: '/次',
-  ),
-  _Product(
-    id: 'device-finder-rent',
-    categoryId: 'device',
-    name: '便携探鱼器租赁',
-    desc: '免押可用 · 数据清除',
-    note: '会员可免押租赁，归还时自动清除个人数据。适合陌生水域快速判断水深和障碍。',
-    price: 79,
-    icon: Icons.sensors_rounded,
-    color: InkPalette.moss,
-    badge: '租赁',
-    delivery: '预约',
-    rating: 4.8,
-    tags: ['探鱼器', '租赁', '设备', '水深'],
-    unit: '/天',
-  ),
-  _Product(
-    id: 'device-smart-scale',
-    categoryId: 'device',
-    name: '智能鱼获秤',
-    desc: '蓝牙同步 · 自动记录',
-    note: '鱼获称重后可同步到钓获记录，适合活动排行、个人统计和复盘。',
-    price: 149,
-    icon: Icons.scale_rounded,
-    color: InkPalette.moss,
-    badge: '记录',
-    delivery: '24h',
-    rating: 4.6,
-    tags: ['鱼获', '蓝牙', '设备', '记录'],
-  ),
-  _Product(
-    id: 'service-rod-care',
-    categoryId: 'service',
-    name: '鱼竿保养服务',
-    desc: '清洁上蜡 · 导环检查',
-    note: '线槽、导环、竿节和手把统一检查，适合高频使用后的周期保养。',
-    price: 49,
-    icon: Icons.handyman_rounded,
-    color: InkPalette.reed,
-    badge: '保养',
-    delivery: '到店',
-    rating: 4.7,
-    tags: ['售后', '鱼竿', '保养', '到店'],
-    unit: '/次',
-  ),
-  _Product(
-    id: 'service-reel-care',
-    categoryId: 'service',
-    name: '鱼轮深度养护',
-    desc: '拆洗润滑 · 泄力检测',
-    note: '针对纺车轮、水滴轮的轴承、线杯和泄力系统做深度清洁维护。',
-    price: 89,
-    icon: Icons.support_agent_rounded,
-    color: InkPalette.reed,
-    badge: '售后',
-    delivery: '到店',
-    rating: 4.8,
-    tags: ['售后', '鱼轮', '清洁', '润滑'],
-    unit: '/次',
-  ),
-];
+final _products = mallProducts
+    .map(_Product.fromMallProduct)
+    .toList(growable: false);

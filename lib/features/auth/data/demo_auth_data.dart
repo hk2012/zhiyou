@@ -11,7 +11,7 @@ class DemoAuthData {
   static const AppUser _seedUser = AppUser(
     id: 1,
     phone: demoPhone,
-    nickname: '江湖钓客演示用户',
+    nickname: '江湖钓客',
     avatarUrl: 'https://example.com/avatar/demo-user.png',
     bio: '喜欢路亚和台钓，正在记录每一次出钓。',
     levelTag: '新手钓友',

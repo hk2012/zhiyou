@@ -13,7 +13,7 @@ set -euo pipefail
 #   ./scripts/ios_install_device.sh demo
 #   ./scripts/ios_install_device.sh all
 #   ./scripts/ios_install_device.sh 00008140-001A38303E02801C
-#   API_BASE_URL=http://192.168.1.10:8080 ./scripts/ios_install_device.sh
+#   API_BASE_URL=http://<Mac局域网IP>:8080 ./scripts/ios_install_device.sh
 #
 # 参数说明：
 #   第 1 个参数：设备别名或设备 ID，默认安装到当前在线 iOS 设备。
@@ -48,7 +48,14 @@ detect_lan_ip() {
 }
 
 LAN_IP="$(detect_lan_ip)"
-API_BASE_URL="${API_BASE_URL:-http://${LAN_IP:-192.168.1.10}:8080}"
+if [[ -z "${API_BASE_URL:-}" ]]; then
+  if [[ -n "$LAN_IP" ]]; then
+    API_BASE_URL="http://$LAN_IP:8080"
+  else
+    echo "错误：未检测到 Mac 局域网 IP，请手动指定 API_BASE_URL=http://<Mac局域网IP>:8080" >&2
+    exit 1
+  fi
+fi
 
 DEMO_DEVICE_ID="00008140-001A38303E02801C"
 TEST_DEVICE_ID="00008110-00190C520168401E"
@@ -121,7 +128,7 @@ if [[ "${#online_device_ids[@]}" -eq 0 ]]; then
   exit 1
 fi
 
-build_args=(ios --release --dart-define="API_BASE_URL=$API_BASE_URL")
+build_args=(ios --release --dart-define="API_ENV=device" --dart-define="API_BASE_URL=$API_BASE_URL")
 
 echo "==> 开始构建 iOS 真机 release 包"
 flutter build "${build_args[@]}"

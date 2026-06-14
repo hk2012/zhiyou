@@ -11,6 +11,7 @@ set -euo pipefail
 #   ./scripts/dev_start.sh
 #   ./scripts/dev_start.sh 8080 5124
 #   SKIP_BUILD=1 ./scripts/dev_start.sh
+#   API_ENV=web API_BASE_URL=http://127.0.0.1:8080 ./scripts/dev_start.sh
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -22,6 +23,7 @@ fi
 BACKEND_PORT="${1:-8080}"
 WEB_PORT="${2:-5124}"
 API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:$BACKEND_PORT}"
+API_ENV="${API_ENV:-web}"
 
 cd "$PROJECT_ROOT"
 
@@ -35,7 +37,7 @@ echo "==> 启动顺序 1/2：后端 FastAPI"
 "$PROJECT_ROOT/scripts/backend_start.sh" "$BACKEND_PORT"
 
 echo "==> 启动顺序 2/2：前端 Flutter Web"
-API_BASE_URL="$API_BASE_URL" "$PROJECT_ROOT/scripts/web_start.sh" "$WEB_PORT"
+API_ENV="$API_ENV" API_BASE_URL="$API_BASE_URL" "$PROJECT_ROOT/scripts/web_start.sh" "$WEB_PORT"
 
 echo "==> 启动后状态检查"
 "$PROJECT_ROOT/scripts/dev_status.sh" "$BACKEND_PORT" "$WEB_PORT"

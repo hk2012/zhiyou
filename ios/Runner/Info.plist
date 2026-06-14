@@ -20,19 +20,28 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
+
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>应用需要访问本地网络以连接到开发服务器</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>智友需要获取当前位置，用于推荐附近水域、今日适合玩法和安全提醒。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>智友需要访问您的相机，用于拍摄渔获照片并在社区分享。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>智友需要访问您的相册，用于选择照片在社区分享。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

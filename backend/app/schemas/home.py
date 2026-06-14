@@ -44,7 +44,7 @@ class ExpertObservation(BaseModel):
 
 
 class HomeSummaryRequest(BaseModel):
-    user_id: Optional[int] = Field(default=1, description="演示阶段默认使用 1 号用户")
+    user_id: Optional[int] = Field(default=1, description="本地开发默认使用 1 号用户")
     location_name: str = Field(default="千岛湖 · 东南湖区")
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -58,7 +58,7 @@ class HomeSummaryRequest(BaseModel):
 
 
 class CatchRecordRequest(BaseModel):
-    user_id: int = Field(default=1, description="演示阶段默认使用 1 号用户")
+    user_id: int = Field(default=1, description="本地开发默认使用 1 号用户")
     location_name: str = Field(default="千岛湖 · 东南湖区")
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -108,7 +108,7 @@ class HomeCardPreferenceItem(BaseModel):
 
 
 class HomeCardPreferencesRequest(BaseModel):
-    user_id: int = Field(default=1, description="演示阶段默认使用 1 号用户")
+    user_id: int = Field(default=1, description="本地开发默认使用 1 号用户")
     cards: list[HomeCardPreferenceItem]
 
 

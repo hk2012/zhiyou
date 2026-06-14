@@ -12,6 +12,7 @@ set -euo pipefail
 #   ./scripts/web_start.sh 5124
 #   SKIP_BUILD=1 ./scripts/web_start.sh 5124
 #   API_BASE_URL=http://127.0.0.1:8080 ./scripts/web_start.sh 5124
+#   API_ENV=web API_BASE_URL=http://127.0.0.1:8080 ./scripts/web_start.sh 5124
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -25,10 +26,25 @@ LOG_FILE="$PROJECT_ROOT/.dart_tool/zhiyou_web_${WEB_PORT}.log"
 PID_FILE="$PROJECT_ROOT/.dart_tool/zhiyou_web_${WEB_PORT}.pid"
 WEB_HOSTNAME="${WEB_HOSTNAME:-0.0.0.0}"
 API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:8080}"
+API_ENV="${API_ENV:-web}"
 SCREEN_NAME="zhiyou_web_${WEB_PORT}"
 
 cd "$PROJECT_ROOT"
 mkdir -p "$PROJECT_ROOT/.dart_tool"
+
+install_browser_probe_files() {
+  local build_dir="$PROJECT_ROOT/build/web"
+
+  if [[ ! -d "$build_dir" ]]; then
+    return
+  fi
+
+  echo "==> 补齐浏览器探测静态文件"
+  mkdir -p "$build_dir/.well-known/appspecific"
+  cp "$PROJECT_ROOT/web/.well-known/appspecific/com.chrome.devtools.json" \
+    "$build_dir/.well-known/appspecific/com.chrome.devtools.json"
+  cp "$PROJECT_ROOT/web/flutter.js.map" "$build_dir/flutter.js.map"
+}
 
 echo "==> 后台重启 Web 服务，端口: $WEB_PORT"
 echo "==> 日志文件: $LOG_FILE"
@@ -41,7 +57,22 @@ fi
 
 if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   echo "==> 构建 Flutter Web 产物"
-  flutter build web --pwa-strategy=none --dart-define="API_BASE_URL=$API_BASE_URL"
+  flutter build web \
+    --release \
+    --pwa-strategy=none \
+    --no-web-resources-cdn \
+    --optimization-level=4 \
+    --no-source-maps \
+    --dart-define="API_ENV=$API_ENV" \
+    --dart-define="API_BASE_URL=$API_BASE_URL"
+fi
+
+install_browser_probe_files
+
+if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
+  if [[ "${PRECOMPRESS_WEB:-1}" == "1" ]]; then
+    "$PROJECT_ROOT/scripts/web_precompress.sh"
+  fi
 fi
 
 echo "==> 启动后台静态服务"
@@ -66,6 +97,8 @@ done
 
 if lsof -tiTCP:"$WEB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "==> 启动成功"
+  echo "==> API 环境: $API_ENV"
+  echo "==> API 地址: $API_BASE_URL"
   echo "==> Mac 本机访问: http://localhost:$WEB_PORT/#/login"
   echo "==> 手机/局域网访问: http://$(ipconfig getifaddr en0 2>/dev/null || echo '<Mac局域网IP>'):$WEB_PORT/#/login"
 else

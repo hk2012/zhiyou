@@ -75,7 +75,7 @@ def create_catch_record(
 ) -> CatchRecordResponse:
     """记录首页低概率战绩。
 
-    先服务首页“记录战绩”弹窗，后续可以扩展到完整鱼获上报模块。
+    先服务首页“记录战绩”弹窗，下一阶段可扩展到完整鱼获上报模块。
     """
     return home_recommendation_service.record_catch(db, payload)
 
@@ -84,6 +84,6 @@ def create_catch_record(
 def preview_home_database(db: Session = Depends(get_db)) -> dict:
     """开发期查看首页模块数据库数据。
 
-    后续上正式权限系统后，这类接口会移动到管理后台并加权限。
+    接入正式权限系统后，这类接口会移动到管理后台并加权限。
     """
     return home_recommendation_service.database_preview(db)

@@ -326,8 +326,8 @@ class HomeRecommendationService:
         if user:
             return user
 
-        # 演示阶段允许自动建用户，方便前端先联调；正式登录后这里会改成鉴权用户。
-        user = AppUser(id=user_id, display_name=f"演示钓友 {user_id}", experience_level="newbie")
+        # 本地开发允许自动建用户，方便前端先联调；接入账号体系后这里会改成鉴权用户。
+        user = AppUser(id=user_id, display_name=f"江湖钓友 {user_id}", experience_level="newbie")
         db.add(user)
         db.flush()
         return user

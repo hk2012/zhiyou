@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -85,3 +87,71 @@ class ExploreSummaryResponse(BaseModel):
     map: ExploreMapResponse
     featured_spot: ExploreFeaturedSpotResponse
     ecosystem_items: list[ExploreEcosystemItemResponse]
+
+
+class SpotDetailSectionItem(BaseModel):
+    """钓点详情通用条目。"""
+
+    title: str
+    subtitle: str
+    status: str = ""
+    accent_key: str = "green"
+
+
+class SpotFishTargetResponse(BaseModel):
+    """钓点目标鱼响应模型。"""
+
+    fish: str
+    activity: int
+    method: str
+    window: str
+
+
+class SpotDetailResponse(BaseModel):
+    """钓点详情响应模型。"""
+
+    spot_id: int
+    name: str
+    province: str
+    city: str
+    water_type: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    headline: str
+    summary: str
+    score: int
+    distance_label: str
+    address_hint: str
+    best_window: str
+    water_temperature: str
+    depth_label: str
+    fish_activity: str
+    risk_level: str
+    risk_text: str
+    parking_label: str
+    route_minutes: int
+    privacy_level: str
+    target_fish: list[SpotFishTargetResponse]
+    facilities: list[SpotDetailSectionItem]
+    rules: list[SpotDetailSectionItem]
+    tactics: list[SpotDetailSectionItem]
+    safety_checklist: list[SpotDetailSectionItem]
+    services: list[SpotDetailSectionItem]
+    forecast: list[SpotDetailSectionItem]
+    updated_at: str
+
+
+class SpotFavoriteRequest(BaseModel):
+    """收藏钓点请求模型。"""
+
+    user_id: int = 1
+    note: str = ""
+
+
+class SpotFavoriteResponse(BaseModel):
+    """收藏钓点响应模型。"""
+
+    spot_id: int
+    user_id: int
+    favorited: bool
+    message: str

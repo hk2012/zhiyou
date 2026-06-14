@@ -19,17 +19,20 @@ class AppSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        left: leftPadding ?? 20.w,
-        bottom: bottomPadding ?? 8.h,
+        left: leftPadding ?? AppSpacing.page.w,
+        bottom: bottomPadding ?? AppSpacing.md.h,
       ),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
           title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 12.sp,
-            fontWeight: FontWeight.bold,
-            color: AppColors.onSurfaceVariant,
+            height: 1.2,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textTertiary,
             letterSpacing: 0,
           ),
         ),
@@ -54,14 +57,14 @@ class AppListGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = borderRadius ?? AppRadii.lg.r;
     final group = Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(borderRadius ?? 12.r),
-        border: Border.all(
-          color: AppColors.surfaceContainerHigh.withValues(alpha: 0.5),
-        ),
-        boxShadow: [AppShadows.ambientShadow],
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [AppShadows.cardShadow],
       ),
       child: Column(
         children: children.asMap().entries.map((entry) {
@@ -71,9 +74,10 @@ class AppListGroup extends StatelessWidget {
               entry.value,
               if (!isLast)
                 Divider(
-                  height: 0,
-                  indent: dividerIndent ?? 60.w,
-                  color: AppColors.surfaceContainerLow,
+                  height: 1,
+                  thickness: 1,
+                  indent: dividerIndent ?? 62.w,
+                  color: AppColors.divider,
                 ),
             ],
           );
@@ -94,7 +98,7 @@ class AppIconBox extends StatelessWidget {
   const AppIconBox({
     super.key,
     required this.icon,
-    this.color = AppColors.primary,
+    this.color = AppColors.brand,
     this.size,
   });
 
@@ -109,8 +113,9 @@ class AppIconBox extends StatelessWidget {
       width: boxSize,
       height: boxSize,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10.r),
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadii.lg.r),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Icon(icon, color: color, size: 19.w),
     );
@@ -143,53 +148,67 @@ class AppMenuTile extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: 14.w,
-            vertical: verticalPadding ?? 12.h,
+            horizontal: AppSpacing.xl.w,
+            vertical: verticalPadding ?? AppSpacing.lg.h,
           ),
           child: Row(
             children: [
               AppIconBox(icon: icon),
-              SizedBox(width: 12.w),
+              SizedBox(width: AppSpacing.lg.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: AppColors.onSurface,
+                        color: AppColors.textPrimary,
                         fontSize: 14.sp,
-                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0,
                       ),
                     ),
                     if (subtitle != null) ...[
-                      SizedBox(height: 2.h),
+                      SizedBox(height: AppSpacing.xs.h),
                       Text(
                         subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: AppColors.onSurfaceVariant,
-                          fontSize: 11.sp,
+                          color: AppColors.textSecondary,
+                          fontSize: 11.5.sp,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0,
                         ),
                       ),
                     ],
                   ],
                 ),
               ),
-              if (trailingText != null)
+              if (trailingText != null) ...[
+                SizedBox(width: AppSpacing.lg.w),
                 Text(
                   trailingText!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: AppColors.onSurfaceVariant,
+                    color: AppColors.textSecondary,
                     fontSize: 12.sp,
-                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
                   ),
                 ),
-              SizedBox(width: 6.w),
+              ],
+              SizedBox(width: AppSpacing.xs.w),
               Icon(
-                Icons.chevron_right,
-                color: AppColors.onSurfaceVariant,
+                Icons.chevron_right_rounded,
+                color: AppColors.textTertiary,
                 size: 20.w,
               ),
             ],

@@ -41,6 +41,8 @@ dependencies:
   flutter_screenutil: ^5.9.3
   geolocator: ^14.0.2
   geocoding: ^4.0.0
+  permission_handler: ^12.0.3
+  image_picker: ^1.2.2
 
 dev_dependencies:
   flutter_test:
@@ -65,22 +67,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/design/
-    - assets/images/v2/
-    - assets/images/v3/
-    - assets/images/ink_style/rice_paper_bg.png
     - assets/images/ink_style/home_lake_hero.png
     - assets/images/ink_style/ink_fishing_map.png
-    - assets/images/ink_style/bamboo_overlay.png
-    - assets/images/ink_style/ink_badge_frames.png
-
-  fonts:
-    - family: MaShanZheng
-      fonts:
-        - asset: assets/fonts/MaShanZheng-Regular.ttf
-    - family: ZCOOLXiaoWei
-      fonts:
-        - asset: assets/fonts/ZCOOLXiaoWei-Regular.ttf
+    - assets/images/app_visuals/commercial_tiles.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

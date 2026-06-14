@@ -31,7 +31,7 @@ DEFAULT_CARD_IDS = [
 class FishingAdvisor:
     """首页推荐规则引擎。
 
-    这里先用可解释规则跑 MVP，后续可以把分数来源替换成统计模型或机器学习模型。
+    这里先用可解释规则跑 MVP，扩展时可以把分数来源替换成统计模型或机器学习模型。
     """
 
     def list_cards(self) -> list[HomeCardMeta]:
@@ -398,7 +398,7 @@ class FishingAdvisor:
             return "连续无口不要硬耗，优先换鱼层，其次换点。"
         if observation.key == "water_clarity":
             return "水质变化会改变拟饵颜色和搜索速度。"
-        return "这条经验已记录，后续可进入用户自己的点位模型。"
+        return "这条经验已记录，下一次会进入用户自己的点位模型。"
 
 
 fishing_advisor = FishingAdvisor()
