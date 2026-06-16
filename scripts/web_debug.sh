@@ -46,7 +46,9 @@ install_browser_probe_files() {
   mkdir -p "$build_dir/.well-known/appspecific"
   cp "$PROJECT_ROOT/web/.well-known/appspecific/com.chrome.devtools.json" \
     "$build_dir/.well-known/appspecific/com.chrome.devtools.json"
-  cp "$PROJECT_ROOT/web/flutter.js.map" "$build_dir/flutter.js.map"
+  if [[ -f "$PROJECT_ROOT/web/flutter.js.map" ]]; then
+    cp "$PROJECT_ROOT/web/flutter.js.map" "$build_dir/flutter.js.map"
+  fi
 }
 
 stop_existing_server() {

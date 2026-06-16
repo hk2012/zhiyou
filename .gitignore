@@ -48,6 +48,11 @@ backend/*.db-*
 
 # Generated local deliverables
 /outputs/
+/backend.zip
+/zhiyou_*.tar.gz
+/web/flutter.js.map
+/deploy_check.exp
+/1panel_cookies.txt
 
 # Symbolication related
 app.*.symbols

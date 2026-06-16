@@ -43,7 +43,9 @@ install_browser_probe_files() {
   mkdir -p "$build_dir/.well-known/appspecific"
   cp "$PROJECT_ROOT/web/.well-known/appspecific/com.chrome.devtools.json" \
     "$build_dir/.well-known/appspecific/com.chrome.devtools.json"
-  cp "$PROJECT_ROOT/web/flutter.js.map" "$build_dir/flutter.js.map"
+  if [[ -f "$PROJECT_ROOT/web/flutter.js.map" ]]; then
+    cp "$PROJECT_ROOT/web/flutter.js.map" "$build_dir/flutter.js.map"
+  fi
 }
 
 echo "==> 后台重启 Web 服务，端口: $WEB_PORT"
