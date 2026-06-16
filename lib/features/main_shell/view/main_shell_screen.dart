@@ -30,7 +30,8 @@ class MainShellScreen extends StatelessWidget {
       bottomNavigationBar: _InkBottomNav(
         currentIndex: navigationShell.currentIndex,
         onTap: _goBranch,
-        onCenterTap: () => context.push(AppRouteNames.creationModal),
+        onCenterTap: () =>
+            context.push('${AppRouteNames.creationModal}?entry=nav'),
       ),
     );
   }
@@ -52,20 +53,20 @@ class _InkBottomNav extends StatelessWidget {
     final safeBottom = MediaQuery.of(context).viewPadding.bottom;
     return Container(
       margin: EdgeInsets.fromLTRB(
-        12.w,
+        10.w,
         0,
-        12.w,
-        safeBottom > 0 ? safeBottom : 10.h,
+        10.w,
+        safeBottom > 0 ? safeBottom * 0.72 : 8.h,
       ),
-      height: 68.h,
+      height: 62.h,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24.r),
+        borderRadius: BorderRadius.circular(22.r),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: InkPalette.rice.withValues(alpha: 0.96),
-              borderRadius: BorderRadius.circular(24.r),
+              borderRadius: BorderRadius.circular(22.r),
               border: Border.all(color: InkPalette.ink.withValues(alpha: 0.20)),
               boxShadow: [
                 BoxShadow(
@@ -81,7 +82,7 @@ class _InkBottomNav extends StatelessWidget {
                 _NavItem(
                   icon: Icons.auto_awesome_outlined,
                   activeIcon: Icons.auto_awesome_rounded,
-                  label: '推荐',
+                  label: '首页',
                   active: currentIndex == 0,
                   onTap: () => onTap(0),
                 ),
@@ -97,14 +98,14 @@ class _InkBottomNav extends StatelessWidget {
                   pressedScale: 0.94,
                   rippleColor: InkPalette.reed,
                   child: SizedBox(
-                    width: 52.w,
+                    width: 48.w,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 42.w,
-                          height: 42.w,
-                          margin: EdgeInsets.only(bottom: 2.h),
+                          width: 38.w,
+                          height: 38.w,
+                          margin: EdgeInsets.only(bottom: 1.h),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: const LinearGradient(
@@ -117,23 +118,23 @@ class _InkBottomNav extends StatelessWidget {
                             boxShadow: [
                               BoxShadow(
                                 color: InkPalette.pine.withValues(alpha: 0.28),
-                                blurRadius: 18,
-                                offset: Offset(0, 9.h),
+                                blurRadius: 14,
+                                offset: Offset(0, 7.h),
                               ),
                             ],
                           ),
                           child: Icon(
-                            Icons.add_rounded,
+                            Icons.play_arrow_rounded,
                             color: InkPalette.white,
-                            size: 25.w,
+                            size: 23.w,
                           ),
                         ),
                         Text(
-                          '发布',
+                          '开钓',
                           maxLines: 1,
                           style: TextStyle(
                             color: InkPalette.ink,
-                            fontSize: 10.5.sp,
+                            fontSize: 10.sp,
                             height: 1,
                             fontWeight: FontWeight.w900,
                           ),
@@ -145,7 +146,7 @@ class _InkBottomNav extends StatelessWidget {
                 _NavItem(
                   icon: Icons.shopping_bag_outlined,
                   activeIcon: Icons.shopping_bag_rounded,
-                  label: '商城',
+                  label: '补给',
                   active: currentIndex == 2,
                   onTap: () => onTap(2),
                 ),
@@ -187,12 +188,12 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 54.w,
+        width: 50.w,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(active ? activeIcon : icon, color: color, size: 22.w),
-            SizedBox(height: 3.h),
+            Icon(active ? activeIcon : icon, color: color, size: 20.w),
+            SizedBox(height: 2.h),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
@@ -200,17 +201,17 @@ class _NavItem extends StatelessWidget {
                 maxLines: 1,
                 style: TextStyle(
                   color: color,
-                  fontSize: 11.5.sp,
+                  fontSize: 10.8.sp,
                   height: 1.1,
                   fontWeight: active ? FontWeight.w900 : FontWeight.w800,
                 ),
               ),
             ),
-            SizedBox(height: 3.h),
+            SizedBox(height: 2.h),
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              width: active ? 16.w : 0,
-              height: 3.h,
+              width: active ? 14.w : 0,
+              height: 2.5.h,
               decoration: BoxDecoration(
                 color: InkPalette.pine,
                 borderRadius: BorderRadius.circular(999),

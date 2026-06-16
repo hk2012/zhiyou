@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
 import '../data/home_recommendation_models.dart';
 import '../data/home_recommendation_repository.dart';
+import '../data/local_city_models.dart';
 import '../providers/iot_device_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -21,13 +23,17 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _scenarioIndex = 0;
+  String _selectedCityCode = 'nanjing';
   bool _isRefreshing = false;
   final List<_FishingMockScenario> _scenarios = List.from(_mockScenarios);
+  List<LocalTrialCity> _trialCities = const [];
+  LocalCityContext? _cityContext;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadTrialCities());
       _fetchRealData(requestPrecise: true);
       unawaited(
         ref.read(iotDevicesProvider.notifier).refreshFromApi(silent: true),
@@ -35,13 +41,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  Future<void> _loadTrialCities() async {
+    try {
+      final cities = await ref
+          .read(homeRecommendationRepositoryProvider)
+          .fetchTrialCities();
+      if (!mounted) return;
+      setState(() => _trialCities = cities);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _trialCities = const []);
+    }
+  }
+
   Future<void> _fetchRealData({bool requestPrecise = true}) async {
     try {
       final repo = ref.read(homeRecommendationRepositoryProvider);
       final loc = await repo.resolveLocation(requestPrecise: requestPrecise);
+      final cityContext = await repo.fetchCityContext(
+        cityCode: _selectedCityCode,
+        origin: loc.isDeviceLocation ? loc : null,
+      );
       final summary = await repo.fetchSummary(
         enabledCardIds: [],
-        location: loc,
+        location: cityContext.recommendationLocation,
+        weatherSnapshot: cityContext.weather,
       );
       if (mounted) {
         setState(() {
@@ -49,7 +73,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             summary,
             _mockScenarios[0],
             loc,
+            cityContext,
           );
+          _cityContext = cityContext;
         });
       }
     } catch (_) {
@@ -71,49 +97,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _scenarioIndex = index);
   }
 
+  void _selectTrialCity(String cityCode) {
+    if (_selectedCityCode == cityCode) return;
+    setState(() {
+      _selectedCityCode = cityCode;
+      _scenarioIndex = 0;
+      _isRefreshing = true;
+    });
+    AppFeedback.showMessage(context, '正在切换试点城市');
+    unawaited(
+      _fetchRealData(requestPrecise: false).whenComplete(() {
+        if (!mounted) return;
+        setState(() => _isRefreshing = false);
+        final cityName = _cityContext?.city.name ?? '试点城市';
+        AppFeedback.showMessage(context, '已切换到$cityName');
+      }),
+    );
+  }
+
+  Future<String> _enqueueVenueVerification(_SpotMock spot) async {
+    final venueId = spot.venueId;
+    if (venueId == null || venueId.isEmpty) {
+      return '当前演示钓点暂不在江苏试点核验队列';
+    }
+    final item = await ref
+        .read(homeRecommendationRepositoryProvider)
+        .enqueueVenueVerification(venueId: venueId, reason: '首页钓场详情发起运营核验');
+    return '${item.title} 已进入${item.priorityLabel}核验队列';
+  }
+
   _FishingMockScenario _mapRealSummaryToMock(
     HomeRecommendationSummary summary,
     _FishingMockScenario fallback,
     HomeLocation location,
+    LocalCityContext? cityContext,
   ) {
+    final primaryVenue = cityContext?.primaryVenue;
     final isReal = location.isDeviceLocation;
-    final statusText = isReal
-        ? '📍 GPS定位 · 刚刚更新'
-        : '默认钓点 · ${location.statusMessage}';
+    final statusText = cityContext == null
+        ? (isReal ? 'GPS定位 · 刚刚更新' : '默认钓点 · ${location.statusMessage}')
+        : '${cityContext.city.role} · ${cityContext.weather.source == 'qweather' ? '和风天气' : '试点天气'}';
+    final fishMethods = _mapFishMethods(summary, fallback);
+    final spots = cityContext == null
+        ? fallback.spots
+        : _mapLocalVenues(cityContext.venues, fallback.spots);
+    final evidence = _mapEvidence(summary, fallback, cityContext);
     return _FishingMockScenario(
       id: summary.recommendationId?.toString() ?? fallback.id,
       railLabel: fallback.railLabel,
       railIcon: fallback.railIcon,
-      location: summary.locationName,
+      location: cityContext?.city.name ?? summary.locationName,
       updateText: statusText,
       alertBadge: fallback.alertBadge,
       heroAsset: fallback.heroAsset,
       heroAlignment: fallback.heroAlignment,
-      weather: fallback.weather,
+      weather: cityContext?.weather.weatherLabel ?? fallback.weather,
       weatherIcon: fallback.weatherIcon,
-      waterTemp: fallback.waterTemp,
+      waterTemp: cityContext?.weather.waterTempLabel ?? fallback.waterTemp,
       depth: fallback.depth,
       score: summary.conclusion.score,
       scoreLabel: summary.conclusion.score >= 80
           ? '极佳'
           : (summary.conclusion.score >= 60 ? '良好' : '较差'),
       conclusion: summary.conclusion.title,
-      target: summary.fishTargets.isNotEmpty
-          ? summary.fishTargets.first.fish
-          : fallback.target,
-      summary: summary.conclusion.summary,
+      target:
+          _firstText(primaryVenue?.fishSpecies) ??
+          (summary.fishTargets.isNotEmpty
+              ? summary.fishTargets.first.fish
+              : fallback.target),
+      summary: cityContext?.nextAction.isNotEmpty == true
+          ? cityContext!.nextAction
+          : summary.conclusion.summary,
       bestTime: summary.conclusion.bestTime,
-      spotHint: summary.conclusion.spotHint,
+      spotHint: primaryVenue?.district ?? summary.conclusion.spotHint,
       avoid: summary.avoidAdvices.isNotEmpty
           ? summary.avoidAdvices.first.title
           : fallback.avoid,
       primaryAction: fallback.primaryAction,
-      navigationHint: fallback.navigationHint,
+      navigationHint:
+          primaryVenue?.route.displayLabel ?? fallback.navigationHint,
       planTitle: fallback.planTitle,
-      planSubtitle: fallback.planSubtitle,
+      planSubtitle: cityContext?.city.strategy ?? fallback.planSubtitle,
       modeLabel: fallback.modeLabel,
       confidence: fallback.confidence,
-      dataSource: isReal ? '实时GPS定位 + 规则引擎' : '默认钓点 + 规则引擎',
+      dataSource: cityContext == null
+          ? (isReal ? '实时GPS定位 + 规则引擎' : '默认钓点 + 规则引擎')
+          : '高德路线入口 + ${cityContext.weather.source == 'qweather' ? '和风天气' : '试点天气'} + 合规提示',
       gearShort: summary.conclusion.rigHint.isNotEmpty
           ? summary.conclusion.rigHint
           : fallback.gearShort,
@@ -129,27 +198,141 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       safetyColor: fallback.safetyColor,
       accent: fallback.accent,
       steps: fallback.steps,
-      evidence: summary.conclusion.reasons.isNotEmpty
-          ? summary.conclusion.reasons
-                .map(
-                  (r) => _EvidenceItem(
-                    icon: Icons.check_circle_outline,
-                    title: r,
-                    subtitle: '',
-                    trailing: '',
-                    color: InkPalette.pine,
-                  ),
-                )
-                .toList()
-          : fallback.evidence,
-      fishMethods: fallback.fishMethods,
-      spots: fallback.spots,
+      evidence: evidence,
+      fishMethods: fishMethods,
+      spots: spots,
     );
+  }
+
+  List<_FishMethod> _mapFishMethods(
+    HomeRecommendationSummary summary,
+    _FishingMockScenario fallback,
+  ) {
+    if (summary.fishTargets.isEmpty) return fallback.fishMethods;
+    final colors = [
+      InkPalette.pine,
+      InkPalette.lake,
+      InkPalette.reed,
+      InkPalette.moss,
+    ];
+    return [
+      for (var i = 0; i < summary.fishTargets.take(4).length; i++)
+        _FishMethod(
+          fish: summary.fishTargets[i].fish,
+          method: summary.fishTargets[i].method,
+          probability: _clampScore(summary.fishTargets[i].score),
+          advice: summary.fishTargets[i].reason,
+          color: colors[i % colors.length],
+        ),
+    ];
+  }
+
+  List<_SpotMock> _mapLocalVenues(
+    List<LocalFishingVenue> venues,
+    List<_SpotMock> fallback,
+  ) {
+    if (venues.isEmpty) return fallback;
+    return [
+      for (final venue in venues)
+        _SpotMock(
+          venueId: venue.venueId,
+          title: venue.title,
+          distance: venue.route.displayLabel,
+          tags: [
+            ...venue.methods,
+            ...venue.fishSpecies,
+            venue.compliance.label,
+          ].take(4).toList(),
+          score: _clampScore((venue.rating * 20).round()),
+          rating: venue.rating,
+          priceLabel: venue.priceSummary,
+          reason: venue.todayReason,
+          bookable: venue.bookable,
+          complianceLabel: venue.compliance.label,
+          complianceSummary: venue.compliance.summary,
+          verificationLabel: venue.verification.label,
+          verificationSummary: venue.verification.summary,
+          verificationItems: [
+            for (final item in venue.verification.items)
+              '${item.title}：${item.status}',
+          ],
+          navigationUrls: venue.navigationUrls,
+        ),
+    ];
+  }
+
+  List<_EvidenceItem> _mapEvidence(
+    HomeRecommendationSummary summary,
+    _FishingMockScenario fallback,
+    LocalCityContext? cityContext,
+  ) {
+    final items = <_EvidenceItem>[];
+    if (cityContext != null) {
+      items.add(
+        _EvidenceItem(
+          icon: Icons.cloud_done_rounded,
+          title: cityContext.weather.summary,
+          subtitle:
+              '${cityContext.weather.windDirection}${cityContext.weather.windLevel}级 · ${cityContext.weather.source == 'qweather' ? '和风天气' : '试点快照'}',
+          trailing: '+天气',
+          color: InkPalette.lake,
+        ),
+      );
+      final compliance = cityContext.complianceNotices.isNotEmpty
+          ? cityContext.complianceNotices.first
+          : null;
+      if (compliance != null) {
+        items.add(
+          _EvidenceItem(
+            icon: Icons.gpp_maybe_rounded,
+            title: compliance.label,
+            subtitle: compliance.summary,
+            trailing: '合规',
+            color: InkPalette.reed,
+          ),
+        );
+      }
+      final venue = cityContext.primaryVenue;
+      if (venue != null) {
+        items.add(
+          _EvidenceItem(
+            icon: Icons.near_me_rounded,
+            title: '${venue.district}方向 ${venue.route.displayLabel}',
+            subtitle: venue.todayReason,
+            trailing: '高德',
+            color: InkPalette.pine,
+          ),
+        );
+      }
+    }
+
+    for (final reason in summary.conclusion.reasons.take(2)) {
+      items.add(
+        _EvidenceItem(
+          icon: Icons.check_circle_outline,
+          title: reason,
+          subtitle: '',
+          trailing: '',
+          color: InkPalette.moss,
+        ),
+      );
+    }
+    return items.isEmpty ? fallback.evidence : items.take(5).toList();
+  }
+
+  String? _firstText(List<String>? values) {
+    if (values == null || values.isEmpty) return null;
+    return values.first;
+  }
+
+  int _clampScore(int value) {
+    return value.clamp(0, 100).toInt();
   }
 
   @override
   Widget build(BuildContext context) {
     final scenario = _scenario;
+    final devices = ref.watch(iotDevicesProvider);
 
     return InkPage(
       child: RefreshIndicator(
@@ -161,15 +344,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             parent: BouncingScrollPhysics(),
           ),
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewPadding.bottom + 116.h,
+            bottom: MediaQuery.of(context).viewPadding.bottom + 92.h,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _HomeTopBar(
                 scenario: scenario,
+                devices: devices,
                 isRefreshing: _isRefreshing,
-                onRefresh: _refreshScenario,
+                onLocationTap: () => _showLocationSheet(
+                  context,
+                  scenario,
+                  cities: _trialCities,
+                  selectedCityCode: _selectedCityCode,
+                  cityContext: _cityContext,
+                  onCitySelected: _selectTrialCity,
+                  onRefresh: _refreshScenario,
+                ),
               ),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 260),
@@ -195,93 +387,116 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: const _RefreshingBanner(),
                       ),
                     Padding(
-                      padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
+                      padding: EdgeInsets.fromLTRB(18.w, 5.h, 18.w, 0),
                       child: _DecisionHeroCard(
                         scenario: scenario,
                         onDetails: () =>
                             _showScenarioDetailSheet(context, scenario),
-                        onPrimary: () => _showPlanSheet(context, scenario),
-                        onPlan: () => _showGearSheet(context, scenario),
+                        onPrimary: () =>
+                            _showStartFishingSheet(context, scenario),
+                        onPlan: () =>
+                            context.go(_exploreRoute(scenario, intent: 'spot')),
                       ),
                     ),
-                    _ScenarioRail(
-                      scenarios: _mockScenarios,
-                      activeIndex: _scenarioIndex,
-                      onSelected: _selectScenario,
-                    ),
                     InkSectionHeader(
-                      title: '智能装备摘要',
-                      subtitle: '设备在线状态、核心数据和出发前提醒',
-                      action: '同步',
-                      onAction: () async {
-                        final fromApi = await ref
-                            .read(iotDevicesProvider.notifier)
-                            .refreshFromApi();
-                        if (!context.mounted) return;
-                        AppFeedback.showMessage(
-                          context,
-                          fromApi ? '设备数据已从后端同步' : '后端不可用，已使用本地设备快照',
-                        );
-                      },
+                      title: '功能中心',
+                      subtitle: '常用功能都在首屏露出',
+                      action: '全部',
+                      onAction: () => _showHomeMoreSheet(
+                        context,
+                        scenario,
+                        ref.read(iotDevicesProvider),
+                        onScenarioSelected: _selectScenario,
+                      ),
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _IotCommandCenter(scenario: scenario),
+                      child: _HomeFunctionDock(
+                        accent: scenario.accent,
+                        actions: [
+                          _HomeFunctionAction(
+                            icon: Icons.place_rounded,
+                            title: '找钓点',
+                            subtitle: '路线/预约',
+                            color: InkPalette.lake,
+                            onTap: () => context.go(
+                              _exploreRoute(scenario, intent: 'spot'),
+                            ),
+                          ),
+                          _HomeFunctionAction(
+                            icon: Icons.play_arrow_rounded,
+                            title: '开钓',
+                            subtitle: '现场模式',
+                            color: scenario.accent,
+                            onTap: () =>
+                                _showStartFishingSheet(context, scenario),
+                          ),
+                          _HomeFunctionAction(
+                            icon: Icons.inventory_2_rounded,
+                            title: '装备',
+                            subtitle: '出发清单',
+                            color: InkPalette.reed,
+                            onTap: () => _showGearSheet(context, scenario),
+                          ),
+                          _HomeFunctionAction(
+                            icon: Icons.sensors_rounded,
+                            title: '设备',
+                            subtitle: '同步/校准',
+                            color: InkPalette.pine,
+                            onTap: () =>
+                                _showDeviceSyncSheet(context, scenario),
+                          ),
+                          _HomeFunctionAction(
+                            icon: Icons.shopping_bag_rounded,
+                            title: '补给',
+                            subtitle: '按场景买',
+                            color: InkPalette.moss,
+                            onTap: () => context.go(AppRouteNames.mall),
+                          ),
+                          _HomeFunctionAction(
+                            icon: Icons.set_meal_rounded,
+                            title: '鱼获',
+                            subtitle: '快速记录',
+                            color: InkPalette.lake,
+                            onTap: () => context.push(_creationRoute(scenario)),
+                          ),
+                        ],
+                      ),
                     ),
                     InkSectionHeader(
-                      title: '开始作钓',
-                      subtitle: '出发、到点校准、装备核对、记录鱼获',
-                      action: '计划',
+                      title: '当前主线',
+                      subtitle: '从推荐到行动',
+                      action: '详情',
                       onAction: () => _showPlanSheet(context, scenario),
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
                       child: _CoreActionGrid(
                         scenario: scenario,
-                        onNavigate: () => context.go(AppRouteNames.explore),
+                        onNavigate: () =>
+                            _showStartFishingSheet(context, scenario),
                         onTune: () => _showFieldTuneSheet(context, scenario),
-                        onGear: () => _showGearSheet(context, scenario),
-                        onCatch: () =>
-                            context.push(AppRouteNames.creationModal),
+                        onGear: () => _showPlanSheet(context, scenario),
+                        onCatch: () => context.push(_creationRoute(scenario)),
                       ),
                     ),
                     InkSectionHeader(
-                      title: '附近钓场',
-                      subtitle: '按当前场景重新排序',
-                      action: '地图',
-                      onAction: () => context.go(AppRouteNames.explore),
+                      title: '推荐钓点',
+                      subtitle: '先看最合适的一个',
+                      action: '更多',
+                      onAction: () =>
+                          context.go(_exploreRoute(scenario, intent: 'spot')),
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _SpotRecommendationList(scenario: scenario),
-                    ),
-                    InkSectionHeader(
-                      title: '作钓补给',
-                      subtitle: '装备包、钓位预约和会员权益',
-                      action: '商城',
-                      onAction: () => context.go(AppRouteNames.mall),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _CommerceConversionPanel(scenario: scenario),
-                    ),
-                    InkSectionHeader(
-                      title: '精选渔获',
-                      subtitle: '真实记录、低概率挑战和分享入口',
-                      action: '发布',
-                      onAction: () => context.push(AppRouteNames.creationModal),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _FeaturedCatchPanel(
+                      child: _SpotRecommendationList(
                         scenario: scenario,
-                        onRecord: () =>
-                            context.push(AppRouteNames.creationModal),
+                        onEnqueueVerification: _enqueueVenueVerification,
                       ),
                     ),
                     InkSectionHeader(
-                      title: '今日作钓计划',
-                      subtitle: scenario.planSubtitle,
+                      title: '今日计划',
+                      subtitle: '照着做，少走弯路',
                       action: '现场修正',
                       onAction: () => _showFieldTuneSheet(context, scenario),
                     ),
@@ -294,39 +509,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     InkSectionHeader(
-                      title: '推荐依据',
-                      subtitle: '让 AI 结论可被信任',
-                      action: '全部',
-                      onAction: () =>
-                          _showScenarioDetailSheet(context, scenario),
+                      title: '设备状态',
+                      subtitle: '只提醒需要处理的事',
+                      action: '同步',
+                      onAction: () => _showDeviceSyncSheet(context, scenario),
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _EvidenceCard(scenario: scenario),
-                    ),
-                    const InkSectionHeader(
-                      title: '鱼种与钓法矩阵',
-                      subtitle: '新手看建议，老手看概率',
+                      child: _IotCommandCenter(scenario: scenario),
                     ),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _FishMethodMatrix(scenario: scenario),
-                    ),
-                    const InkSectionHeader(
-                      title: '辅助信号',
-                      subtitle: '设备、安全、真实鱼获轻量提示',
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      child: _AuxiliarySignalList(
+                      padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 0),
+                      child: _HomeMorePreview(
                         scenario: scenario,
-                        onDevice: () => _showDeviceSheet(
+                        onOpenAll: () => _showHomeMoreSheet(
                           context,
                           scenario,
                           ref.read(iotDevicesProvider),
+                          onScenarioSelected: _selectScenario,
                         ),
                       ),
                     ),
+                    SizedBox(height: 18.h),
                   ],
                 ),
               ),
@@ -338,21 +542,139 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
+String _exploreRoute(
+  _FishingMockScenario scenario, {
+  String intent = 'spot',
+  String? spot,
+}) {
+  return _scenarioRoute(
+    AppRouteNames.explore,
+    scenario,
+    intent: intent,
+    spot: spot,
+  );
+}
+
+String _mallRoute(
+  _FishingMockScenario scenario, {
+  String intent = 'gear',
+  String? query,
+}) {
+  return _scenarioRoute(
+    AppRouteNames.mall,
+    scenario,
+    intent: intent,
+    query: query ?? scenario.target,
+  );
+}
+
+String _creationRoute(_FishingMockScenario scenario, {String? spot}) {
+  return _scenarioRoute(
+    AppRouteNames.creationModal,
+    scenario,
+    intent: 'catch',
+    spot: spot,
+  );
+}
+
+String _scenarioRoute(
+  String path,
+  _FishingMockScenario scenario, {
+  required String intent,
+  String? spot,
+  String? query,
+}) {
+  final method = _scenarioMethod(scenario);
+  return Uri(
+    path: path,
+    queryParameters: {
+      'entry': 'home',
+      'intent': intent,
+      'spot': spot ?? scenario.location,
+      'fish': scenario.target,
+      'method': method,
+      'window': scenario.bestTime,
+      'hint': scenario.spotHint,
+      if (query != null && query.trim().isNotEmpty) 'query': query.trim(),
+    },
+  ).toString();
+}
+
+String _scenarioMethod(_FishingMockScenario scenario) {
+  if (scenario.fishMethods.isNotEmpty) {
+    return scenario.fishMethods.first.method;
+  }
+  final parts = scenario.gearShort.split('/');
+  return parts.first.trim().isEmpty ? scenario.gearShort : parts.first.trim();
+}
+
+void _showHomeMoreSheet(
+  BuildContext context,
+  _FishingMockScenario scenario,
+  List<IotDeviceState> devices, {
+  required ValueChanged<int> onScenarioSelected,
+}) {
+  showInkActionSheet(
+    context,
+    title: '更多工具',
+    subtitle: '解释、补给、鱼获和场景切换都放在这里',
+    icon: Icons.dashboard_customize_rounded,
+    color: scenario.accent,
+    showLandscape: true,
+    children: [
+      _EvidenceCard(scenario: scenario),
+      SizedBox(height: 10.h),
+      _CommerceConversionPanel(scenario: scenario),
+      SizedBox(height: 10.h),
+      _FeaturedCatchPanel(
+        scenario: scenario,
+        onRecord: () => context.push(_creationRoute(scenario)),
+      ),
+      SizedBox(height: 10.h),
+      _FishMethodMatrix(scenario: scenario),
+      SizedBox(height: 10.h),
+      _AuxiliarySignalList(
+        scenario: scenario,
+        onDevice: () => _showDeviceSheet(context, scenario, devices),
+      ),
+      SizedBox(height: 10.h),
+      _ScenarioRail(
+        scenarios: _mockScenarios,
+        activeIndex: _mockScenarios.indexWhere(
+          (item) => item.id == scenario.id,
+        ),
+        onSelected: onScenarioSelected,
+      ),
+    ],
+    actions: [
+      InkSheetAction(
+        icon: Icons.inventory_2_rounded,
+        title: '装备方案',
+        subtitle: '查看今天需要带什么',
+        color: scenario.accent,
+        onTap: () => _showGearSheet(context, scenario),
+      ),
+    ],
+  );
+}
+
 class _HomeTopBar extends StatelessWidget {
   const _HomeTopBar({
     required this.scenario,
+    required this.devices,
     required this.isRefreshing,
-    required this.onRefresh,
+    required this.onLocationTap,
   });
 
   final _FishingMockScenario scenario;
+  final List<IotDeviceState> devices;
   final bool isRefreshing;
-  final VoidCallback onRefresh;
+  final VoidCallback onLocationTap;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 6.h),
+      padding: EdgeInsets.fromLTRB(18.w, 6.h, 18.w, 3.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -362,23 +684,23 @@ class _HomeTopBar extends StatelessWidget {
               const Spacer(),
               InkRoundButton(
                 icon: Icons.shopping_cart_outlined,
-                onTap: () => context.go(AppRouteNames.mall),
+                onTap: () => context.go(_mallRoute(scenario, intent: 'gear')),
               ),
               SizedBox(width: 8.w),
               InkRoundButton(
                 icon: Icons.notifications_none_rounded,
                 badge: scenario.alertBadge,
-                onTap: () => _showNotificationSheet(context, scenario),
+                onTap: () => _showNotificationSheet(context, scenario, devices),
               ),
             ],
           ),
-          SizedBox(height: 10.h),
+          SizedBox(height: 7.h),
           InkPressable(
-            onTap: onRefresh,
+            onTap: onLocationTap,
             child: Container(
               width: double.infinity,
-              constraints: BoxConstraints(minHeight: 56.h),
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 9.h),
+              constraints: BoxConstraints(minHeight: 48.h),
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
               decoration: BoxDecoration(
                 color: InkPalette.white.withValues(alpha: 0.82),
                 borderRadius: BorderRadius.circular(18.r),
@@ -386,66 +708,461 @@ class _HomeTopBar extends StatelessWidget {
                 boxShadow: [
                   BoxShadow(
                     color: InkPalette.ink.withValues(alpha: 0.05),
-                    blurRadius: 12,
-                    offset: Offset(0, 5.h),
+                    blurRadius: 10,
+                    offset: Offset(0, 4.h),
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  InkIconMark(
-                    icon: Icons.location_on_rounded,
-                    color: scenario.accent,
-                    size: 38,
-                    iconSize: 18,
-                  ),
-                  SizedBox(width: 10.w),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          scenario.location,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: InkPalette.text,
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w900,
-                          ),
+                  Row(
+                    children: [
+                      InkIconMark(
+                        icon: Icons.location_on_rounded,
+                        color: scenario.accent,
+                        size: 34,
+                        iconSize: 17,
+                      ),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              scenario.location,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: InkPalette.text,
+                                fontSize: 14.5.sp,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            SizedBox(height: 2.h),
+                            Text(
+                              scenario.updateText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: InkPalette.muted,
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 3.h),
-                        Text(
-                          scenario.updateText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: InkPalette.muted,
-                            fontSize: 11.5.sp,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      ),
+                      SizedBox(width: 6.w),
+                      AnimatedRotation(
+                        turns: isRefreshing ? 1 : 0,
+                        duration: const Duration(milliseconds: 720),
+                        child: Icon(
+                          isRefreshing
+                              ? Icons.sync_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          color: InkPalette.muted,
+                          size: 17.w,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 8.w),
-                  AnimatedRotation(
-                    turns: isRefreshing ? 1 : 0,
-                    duration: const Duration(milliseconds: 720),
-                    child: Icon(
-                      isRefreshing
-                          ? Icons.sync_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      color: InkPalette.muted,
-                      size: 18.w,
-                    ),
+                  SizedBox(height: 7.h),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TopStatusPill(
+                          icon: scenario.weatherIcon,
+                          label: scenario.weather,
+                          color: scenario.accent,
+                        ),
+                      ),
+                      SizedBox(width: 6.w),
+                      Expanded(
+                        child: _TopStatusPill(
+                          icon: Icons.water_drop_rounded,
+                          label: scenario.waterTemp.replaceFirst('水温 ', ''),
+                          color: InkPalette.lake,
+                        ),
+                      ),
+                      SizedBox(width: 6.w),
+                      Expanded(
+                        child: _TopStatusPill(
+                          icon: Icons.waves_rounded,
+                          label: _conditionBrief(scenario),
+                          color: InkPalette.moss,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TopStatusPill extends StatelessWidget {
+  const _TopStatusPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minHeight: 28.h),
+      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 5.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 13.w),
+          SizedBox(width: 4.w),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.text,
+                fontSize: 10.8.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _conditionBrief(_FishingMockScenario scenario) {
+  if (scenario.evidence.isEmpty) return scenario.depth;
+  final text = scenario.evidence.first.title.split('，').first.trim();
+  if (text.length <= 7) return text;
+  return text.substring(0, 7);
+}
+
+class _HomeFunctionDock extends StatelessWidget {
+  const _HomeFunctionDock({required this.actions, required this.accent});
+
+  final List<_HomeFunctionAction> actions;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstRow = actions.take(3).toList(growable: false);
+    final secondRow = actions.skip(3).take(3).toList(growable: false);
+    return InkGlassCard(
+      padding: EdgeInsets.all(10.r),
+      child: Column(
+        children: [
+          _HomeFunctionRow(actions: firstRow, accent: accent, primaryIndex: 1),
+          SizedBox(height: 8.h),
+          _HomeFunctionRow(actions: secondRow, accent: accent),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeFunctionRow extends StatelessWidget {
+  const _HomeFunctionRow({
+    required this.actions,
+    required this.accent,
+    this.primaryIndex = -1,
+  });
+
+  final List<_HomeFunctionAction> actions;
+  final Color accent;
+  final int primaryIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < actions.length; i++) ...[
+          Expanded(
+            child: InkEntrance(
+              delay: Duration(milliseconds: 35 * i),
+              offset: 8,
+              child: _HomeFunctionTile(
+                action: actions[i],
+                isPrimary: i == primaryIndex,
+                accent: accent,
+              ),
+            ),
+          ),
+          if (i != actions.length - 1) SizedBox(width: 8.w),
+        ],
+      ],
+    );
+  }
+}
+
+class _HomeFunctionTile extends StatelessWidget {
+  const _HomeFunctionTile({
+    required this.action,
+    required this.isPrimary,
+    required this.accent,
+  });
+
+  final _HomeFunctionAction action;
+  final bool isPrimary;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkPressable(
+      onTap: action.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        height: 72.h,
+        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: isPrimary
+              ? accent.withValues(alpha: 0.14)
+              : action.color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: isPrimary
+                ? accent.withValues(alpha: 0.22)
+                : action.color.withValues(alpha: 0.12),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 24.w,
+              height: 24.w,
+              decoration: BoxDecoration(
+                color: action.color.withValues(alpha: 0.13),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(action.icon, color: action.color, size: 15.w),
+            ),
+            const Spacer(),
+            Text(
+              action.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.text,
+                fontSize: 12.2.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(height: 2.h),
+            Text(
+              action.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.muted,
+                fontSize: 9.8.sp,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeMorePreview extends StatelessWidget {
+  const _HomeMorePreview({required this.scenario, required this.onOpenAll});
+
+  final _FishingMockScenario scenario;
+  final VoidCallback onOpenAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final previews = [
+      _HomePreviewItem(
+        icon: Icons.insights_rounded,
+        title: '推荐依据',
+        subtitle: scenario.evidence.isEmpty
+            ? scenario.dataSource
+            : scenario.evidence.first.title,
+        color: InkPalette.lake,
+      ),
+      _HomePreviewItem(
+        icon: Icons.set_meal_rounded,
+        title: '鱼种打法',
+        subtitle: scenario.fishMethods.isEmpty
+            ? scenario.target
+            : '${scenario.fishMethods.first.fish} · ${scenario.fishMethods.first.method}',
+        color: scenario.accent,
+      ),
+      _HomePreviewItem(
+        icon: Icons.shopping_bag_rounded,
+        title: '补给建议',
+        subtitle: scenario.gearShort,
+        color: InkPalette.reed,
+      ),
+      _HomePreviewItem(
+        icon: Icons.photo_camera_rounded,
+        title: '钓友鱼获',
+        subtitle: '看真实收获和同水域反馈',
+        color: InkPalette.moss,
+      ),
+    ];
+
+    return InkGlassCard(
+      padding: EdgeInsets.all(12.r),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              InkCommercialVisual(
+                kind: InkVisualTileKind.spot,
+                width: 54,
+                height: 54,
+                radius: 15,
+                borderColor: scenario.accent.withValues(alpha: 0.14),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '更多功能',
+                      style: TextStyle(
+                        color: InkPalette.text,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      '依据、打法、补给和钓友反馈',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.muted,
+                        fontSize: 10.8.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              InkPressable(
+                onTap: onOpenAll,
+                child: Row(
+                  children: [
+                    Text(
+                      '展开',
+                      style: TextStyle(
+                        color: scenario.accent,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(width: 3.w),
+                    Icon(
+                      Icons.keyboard_arrow_right_rounded,
+                      color: scenario.accent,
+                      size: 18.w,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          for (var i = 0; i < previews.length; i++) ...[
+            InkEntrance(
+              delay: Duration(milliseconds: 30 * i),
+              offset: 6,
+              child: _HomePreviewRow(item: previews[i], onTap: onOpenAll),
+            ),
+            if (i != previews.length - 1) SizedBox(height: 8.h),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HomePreviewRow extends StatelessWidget {
+  const _HomePreviewRow({required this.item, required this.onTap});
+
+  final _HomePreviewItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkPressable(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 9.h),
+        decoration: BoxDecoration(
+          color: item.color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(15.r),
+          border: Border.all(color: item.color.withValues(alpha: 0.10)),
+        ),
+        child: Row(
+          children: [
+            InkIconMark(
+              icon: item.icon,
+              color: item.color,
+              size: 34,
+              iconSize: 17,
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: InkPalette.text,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    item.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: InkPalette.muted,
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: item.color.withValues(alpha: 0.72),
+              size: 18.w,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -465,9 +1182,9 @@ class _ScenarioRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 50.h,
+      height: 42.h,
       child: ListView.separated(
-        padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
+        padding: EdgeInsets.fromLTRB(18.w, 5.h, 18.w, 0),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: scenarios.length,
@@ -531,8 +1248,8 @@ class _CommerceConversionPanel extends StatelessWidget {
         children: [
           const InkInfoRow(
             icon: Icons.local_offer_rounded,
-            title: '商业化 Banner',
-            subtitle: '基于鱼情、设备和附近钓场生成可直接购买方案',
+            title: '今日补给推荐',
+            subtitle: '基于鱼情、设备和附近钓场生成可购买方案',
             trailing: '领券',
             color: InkPalette.reed,
           ),
@@ -547,7 +1264,7 @@ class _CommerceConversionPanel extends StatelessWidget {
                   meta: '3件套 · 省¥46',
                   cta: '一键加购',
                   color: InkPalette.reed,
-                  onTap: () => context.go(AppRouteNames.mall),
+                  onTap: () => context.go(_mallRoute(scenario, intent: 'gear')),
                 ),
               ),
               SizedBox(width: 10.w),
@@ -559,7 +1276,8 @@ class _CommerceConversionPanel extends StatelessWidget {
                   meta: '剩余 12 位',
                   cta: '立即预约',
                   color: scenario.accent,
-                  onTap: () => context.go(AppRouteNames.explore),
+                  onTap: () =>
+                      context.go(_exploreRoute(scenario, intent: 'booking')),
                 ),
               ),
             ],
@@ -732,17 +1450,22 @@ class _IotCommandCenter extends ConsumerWidget {
     final summary = ref.watch(iotDeviceSummaryProvider);
     final loadState = ref.watch(iotDeviceLoadStateProvider);
     final coreDevice = summary.coreDevice;
+    final deviceConclusion = summary.warningCount == 0
+        ? '设备基本正常，可以按计划出发'
+        : summary.lowestBattery <= 30
+        ? '设备基本正常，1 台电量偏低，出发前先充电'
+        : '设备基本正常，${summary.warningCount} 台需要出发前处理';
 
     return InkGlassCard(
-      padding: EdgeInsets.all(13.r),
+      padding: EdgeInsets.all(11.r),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 48.w,
-                height: 48.w,
+                width: 40.w,
+                height: 40.w,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -750,44 +1473,44 @@ class _IotCommandCenter extends ConsumerWidget {
                       Color.lerp(InkPalette.lake, scenario.accent, 0.42)!,
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(18.r),
+                  borderRadius: BorderRadius.circular(15.r),
                   boxShadow: [
                     BoxShadow(
                       color: InkPalette.pine.withValues(alpha: 0.20),
-                      blurRadius: 18,
-                      offset: Offset(0, 8.h),
+                      blurRadius: 14,
+                      offset: Offset(0, 6.h),
                     ),
                   ],
                 ),
                 child: Icon(
                   Icons.settings_input_antenna_rounded,
                   color: InkPalette.white,
-                  size: 24.w,
+                  size: 21.w,
                 ),
               ),
-              SizedBox(width: 11.w),
+              SizedBox(width: 9.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '设备状态与复购提醒',
+                      '设备出发检查',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: InkPalette.text,
-                        fontSize: 16.sp,
+                        fontSize: 15.sp,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 4.h),
+                    SizedBox(height: 2.h),
                     Text(
-                      '${coreDevice.title} · ${coreDevice.telemetryLabel} ${coreDevice.telemetryValue} · 配件可补货',
+                      deviceConclusion,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: InkPalette.muted,
-                        fontSize: 12.sp,
+                        fontSize: 11.sp,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -795,15 +1518,15 @@ class _IotCommandCenter extends ConsumerWidget {
                 ),
               ),
               InkChip(
-                label: '${summary.onlineCount}/${summary.totalCount}',
+                label: '在线 ${summary.onlineCount}/${summary.totalCount}',
                 active: true,
                 color: scenario.accent,
               ),
             ],
           ),
-          SizedBox(height: 10.h),
+          SizedBox(height: 8.h),
           _IotSourceBanner(state: loadState, accent: scenario.accent),
-          SizedBox(height: 12.h),
+          SizedBox(height: 8.h),
           Row(
             children: [
               Expanded(
@@ -814,7 +1537,7 @@ class _IotCommandCenter extends ConsumerWidget {
                   color: scenario.accent,
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 7.w),
               Expanded(
                 child: _IotSummaryMetric(
                   icon: Icons.battery_charging_full_rounded,
@@ -823,7 +1546,7 @@ class _IotCommandCenter extends ConsumerWidget {
                   color: InkPalette.moss,
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 7.w),
               Expanded(
                 child: _IotSummaryMetric(
                   icon: Icons.network_check_rounded,
@@ -834,51 +1557,49 @@ class _IotCommandCenter extends ConsumerWidget {
               ),
             ],
           ),
-          SizedBox(height: 11.h),
+          SizedBox(height: 8.h),
           Container(
-            padding: EdgeInsets.all(11.r),
+            padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 8.h),
             decoration: BoxDecoration(
               color: scenario.accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16.r),
+              borderRadius: BorderRadius.circular(14.r),
               border: Border.all(
                 color: scenario.accent.withValues(alpha: 0.14),
               ),
             ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 InkIconMark(
                   icon: _iotDeviceIcon(coreDevice.type),
                   color: scenario.accent,
-                  size: 36,
-                  iconSize: 18,
+                  size: 30,
+                  iconSize: 15,
                 ),
-                SizedBox(width: 10.w),
+                SizedBox(width: 8.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '设备结论：${coreDevice.actionHint}',
-                        maxLines: 2,
+                        coreDevice.actionHint,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: InkPalette.text,
-                          fontSize: 13.sp,
-                          height: 1.34,
+                          fontSize: 12.sp,
+                          height: 1.2,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      SizedBox(height: 5.h),
+                      SizedBox(height: 3.h),
                       Text(
-                        summary.warningCount == 0
-                            ? '全部设备状态稳定，可以直接按今日计划执行。'
-                            : '${summary.warningCount} 台设备需要关注，出发前建议同步或校准。',
+                        '${coreDevice.title} · ${coreDevice.telemetryLabel} ${coreDevice.telemetryValue}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: InkPalette.muted,
-                          fontSize: 11.5.sp,
+                          fontSize: 10.5.sp,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -888,50 +1609,42 @@ class _IotCommandCenter extends ConsumerWidget {
               ],
             ),
           ),
-          SizedBox(height: 12.h),
-          SizedBox(
-            height: 162.h,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: devices.length,
-              separatorBuilder: (_, _) => SizedBox(width: 10.w),
-              itemBuilder: (context, index) {
-                final device = devices[index];
-                return _IotDeviceCard(
-                  device: device,
-                  accent: scenario.accent,
-                  onTap: () {
-                    ref
-                        .read(iotDevicesProvider.notifier)
-                        .toggleDevice(device.id);
-                    AppFeedback.showMessage(
-                      context,
-                      device.isActive
-                          ? '${device.title} 已切到待机'
-                          : '${device.title} 已启动',
-                    );
-                  },
+          SizedBox(height: 8.h),
+          _IotCompactDeviceStrip(
+            devices: devices,
+            accent: scenario.accent,
+            onDeviceTap: (device) => _showSingleDeviceSheet(
+              context,
+              scenario,
+              device,
+              onToggle: () {
+                ref.read(iotDevicesProvider.notifier).toggleDevice(device.id);
+                AppFeedback.showMessage(
+                  context,
+                  device.isActive
+                      ? '${device.title} 已切到待机'
+                      : '${device.title} 已启动',
                 );
               },
             ),
           ),
-          SizedBox(height: 12.h),
+          SizedBox(height: 9.h),
           Row(
             children: [
               Expanded(
                 child: InkPrimaryButton(
-                  label: '购买配件',
-                  icon: Icons.shopping_bag_rounded,
-                  color: InkPalette.reed,
-                  onTap: () => context.go(AppRouteNames.mall),
+                  label: '同步设备',
+                  icon: Icons.sync_rounded,
+                  color: scenario.accent,
+                  onTap: () => _showDeviceSyncSheet(context, scenario),
                 ),
               ),
               SizedBox(width: 10.w),
               Expanded(
                 child: InkSecondaryButton(
-                  label: '申请维修',
-                  icon: Icons.build_circle_outlined,
+                  label: '校准建议',
+                  icon: Icons.tune_rounded,
+                  color: InkPalette.lake,
                   onTap: () => _showDeviceCalibrationSheet(context, scenario),
                 ),
               ),
@@ -959,11 +1672,11 @@ class _IotSummaryMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(minHeight: 76.h),
-      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 9.h),
+      constraints: BoxConstraints(minHeight: 58.h),
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 7.h),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(15.r),
+        borderRadius: BorderRadius.circular(13.r),
         border: Border.all(color: color.withValues(alpha: 0.13)),
       ),
       child: Column(
@@ -972,8 +1685,8 @@ class _IotSummaryMetric extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 15.w),
-              SizedBox(width: 5.w),
+              Icon(icon, color: color, size: 14.w),
+              SizedBox(width: 4.w),
               Expanded(
                 child: Text(
                   label,
@@ -981,21 +1694,21 @@ class _IotSummaryMetric extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: InkPalette.muted,
-                    fontSize: 10.5.sp,
+                    fontSize: 10.sp,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 6.h),
+          SizedBox(height: 4.h),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.text,
-              fontSize: 17.sp,
+              fontSize: 15.5.sp,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1021,10 +1734,10 @@ class _IotSourceBanner extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 6.h),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14.r),
+        borderRadius: BorderRadius.circular(13.r),
         border: Border.all(color: color.withValues(alpha: 0.14)),
       ),
       child: Row(
@@ -1032,57 +1745,74 @@ class _IotSourceBanner extends StatelessWidget {
           Icon(
             state.isLoading ? Icons.sync_rounded : icon,
             color: color,
-            size: 16.w,
+            size: 15.w,
           ),
-          SizedBox(width: 8.w),
+          SizedBox(width: 7.w),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  state.isFromApi ? '后端设备数据' : '本地兜底快照',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.text,
-                    fontSize: 11.5.sp,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 2.h),
-                Text(
-                  state.message,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.muted,
-                    fontSize: 10.5.sp,
-                    height: 1.25,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (state.isLoading) ...[
-                  SizedBox(height: 6.h),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      minHeight: 3.h,
-                      color: color,
-                      backgroundColor: color.withValues(alpha: 0.12),
-                    ),
-                  ),
-                ],
-              ],
+            child: Text(
+              state.isFromApi ? '后端 API · 已同步设备状态' : '本地快照 · 演示兜底',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.text,
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
+          if (state.isLoading) ...[
+            SizedBox(width: 8.w),
+            SizedBox(
+              width: 46.w,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 3.h,
+                  color: color,
+                  backgroundColor: color.withValues(alpha: 0.12),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _IotDeviceCard extends StatelessWidget {
-  const _IotDeviceCard({
+class _IotCompactDeviceStrip extends StatelessWidget {
+  const _IotCompactDeviceStrip({
+    required this.devices,
+    required this.accent,
+    required this.onDeviceTap,
+  });
+
+  final List<IotDeviceState> devices;
+  final Color accent;
+  final ValueChanged<IotDeviceState> onDeviceTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleDevices = devices.take(4).toList(growable: false);
+    return Row(
+      children: [
+        for (var i = 0; i < visibleDevices.length; i++) ...[
+          Expanded(
+            child: _IotCompactDevicePill(
+              device: visibleDevices[i],
+              accent: accent,
+              onTap: () => onDeviceTap(visibleDevices[i]),
+            ),
+          ),
+          if (i != visibleDevices.length - 1) SizedBox(width: 7.w),
+        ],
+      ],
+    );
+  }
+}
+
+class _IotCompactDevicePill extends StatelessWidget {
+  const _IotCompactDevicePill({
     required this.device,
     required this.accent,
     required this.onTap,
@@ -1097,148 +1827,50 @@ class _IotDeviceCard extends StatelessWidget {
     final color = device.isActive
         ? _iotDeviceColor(device, accent)
         : InkPalette.faint;
-    final signal = device.signalLevel.clamp(0, 100) / 100;
-
-    return SizedBox(
-      width: 182.w,
-      child: InkCard(
-        padding: EdgeInsets.all(11.r),
-        color: device.isActive
-            ? InkPalette.white.withValues(alpha: 0.88)
-            : InkPalette.paper.withValues(alpha: 0.74),
-        borderColor: color.withValues(alpha: device.isActive ? 0.22 : 0.14),
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return InkPressable(
+      onTap: onTap,
+      child: Container(
+        height: 42.h,
+        padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: device.isActive ? 0.09 : 0.06),
+          borderRadius: BorderRadius.circular(13.r),
+          border: Border.all(color: color.withValues(alpha: 0.16)),
+        ),
+        child: Row(
           children: [
-            Row(
-              children: [
-                InkIconMark(
-                  icon: _iotDeviceIcon(device.type),
-                  color: color,
-                  size: 36,
-                  iconSize: 18,
-                ),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        device.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: InkPalette.text,
-                          fontSize: 12.5.sp,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      SizedBox(height: 2.h),
-                      Text(
-                        device.sceneRole,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: InkPalette.muted,
-                          fontSize: 10.5.sp,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 10.h),
-            Text(
-              device.telemetryValue,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 21.sp,
-                height: 1,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            SizedBox(height: 4.h),
-            Text(
-              '${device.telemetryLabel} · ${device.workingState}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: InkPalette.muted,
-                fontSize: 10.8.sp,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                _IotMiniPill(
-                  label: device.isActive ? '运行' : '待机',
-                  color: color,
-                ),
-                SizedBox(width: 6.w),
-                _IotMiniPill(label: device.riskLabel, color: color),
-              ],
-            ),
-            SizedBox(height: 8.h),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: signal,
-                      minHeight: 5.h,
-                      color: color,
-                      backgroundColor: InkPalette.line.withValues(alpha: 0.55),
+            Icon(_iotDeviceIcon(device.type), color: color, size: 15.w),
+            SizedBox(width: 5.w),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _shortDeviceName(device.title),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: InkPalette.text,
+                      fontSize: 10.5.sp,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ),
-                SizedBox(width: 8.w),
-                Text(
-                  '${device.batteryLevel}%',
-                  style: TextStyle(
-                    color: InkPalette.text,
-                    fontSize: 10.5.sp,
-                    fontWeight: FontWeight.w900,
+                  SizedBox(height: 1.h),
+                  Text(
+                    '${device.batteryLevel}% · ${device.riskLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: InkPalette.muted,
+                      fontSize: 9.5.sp,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _IotMiniPill extends StatelessWidget {
-  const _IotMiniPill({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 3.h),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.14)),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: color,
-          fontSize: 10.sp,
-          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -1279,6 +1911,16 @@ Color _iotDeviceColor(IotDeviceState device, Color accent) {
   };
 }
 
+String _shortDeviceName(String title) {
+  final name = title
+      .replaceAll('智能', '')
+      .replaceAll('FC-01', '')
+      .replaceAll('BOX-01', '')
+      .replaceAll(RegExp(r'\s+'), '')
+      .trim();
+  return name.isEmpty ? title : name;
+}
+
 class _DecisionHeroCard extends StatelessWidget {
   const _DecisionHeroCard({
     required this.scenario,
@@ -1297,7 +1939,7 @@ class _DecisionHeroCard extends StatelessWidget {
     return InkPressable(
       onTap: onDetails,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24.r),
+        borderRadius: BorderRadius.circular(22.r),
         child: Stack(
           children: [
             Positioned.fill(
@@ -1334,7 +1976,7 @@ class _DecisionHeroCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(12.w, 12.h, 12.w, 12.h),
+              padding: EdgeInsets.fromLTRB(10.w, 10.h, 10.w, 10.h),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1343,25 +1985,21 @@ class _DecisionHeroCard extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Wrap(
-                          spacing: 7.w,
-                          runSpacing: 7.h,
+                          spacing: 6.w,
+                          runSpacing: 5.h,
                           children: [
                             const _FrostTag(
                               icon: Icons.auto_graph_rounded,
-                              label: '智能适钓指数',
+                              label: '今日建议',
                             ),
                             _FrostTag(
                               icon: scenario.weatherIcon,
                               label: scenario.weather,
                             ),
-                            _FrostTag(
-                              icon: Icons.water_drop_rounded,
-                              label: scenario.waterTemp,
-                            ),
                           ],
                         ),
                       ),
-                      SizedBox(width: 10.w),
+                      SizedBox(width: 8.w),
                       _DecisionScoreRing(
                         score: scenario.score,
                         label: scenario.scoreLabel,
@@ -1369,7 +2007,7 @@ class _DecisionHeroCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  SizedBox(height: 10.h),
+                  SizedBox(height: 8.h),
                   _HeroReadabilityPanel(
                     scenario: scenario,
                     onPrimary: onPrimary,
@@ -1464,16 +2102,16 @@ class _HeroReadabilityPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(11.w, 10.h, 11.w, 11.h),
+      padding: EdgeInsets.fromLTRB(10.w, 9.h, 10.w, 10.h),
       decoration: BoxDecoration(
         color: InkPalette.ink.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(20.r),
+        borderRadius: BorderRadius.circular(18.r),
         border: Border.all(color: InkPalette.white.withValues(alpha: 0.18)),
         boxShadow: [
           BoxShadow(
             color: InkPalette.ink.withValues(alpha: 0.26),
-            blurRadius: 22,
-            offset: Offset(0, 10.h),
+            blurRadius: 18,
+            offset: Offset(0, 8.h),
           ),
         ],
       ),
@@ -1481,7 +2119,7 @@ class _HeroReadabilityPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '适钓指数 ${scenario.score} · ${scenario.conclusion}',
+            scenario.conclusion,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1499,77 +2137,69 @@ class _HeroReadabilityPanel extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(height: 5.h),
+          SizedBox(height: 4.h),
           Text(
-            '主攻：${scenario.target}',
+            '${scenario.target} · ${scenario.bestTime}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.white,
-              fontSize: 15.sp,
+              fontSize: 14.sp,
               height: 1.16,
               fontWeight: FontWeight.w900,
               shadows: const [Shadow(color: Color(0xAA000000), blurRadius: 8)],
             ),
           ),
-          SizedBox(height: 7.h),
+          SizedBox(height: 5.h),
           Text(
             scenario.summary,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.white.withValues(alpha: 0.96),
-              fontSize: 12.sp,
-              height: 1.34,
+              fontSize: 11.5.sp,
+              height: 1.24,
               fontWeight: FontWeight.w800,
               shadows: const [Shadow(color: Color(0x99000000), blurRadius: 6)],
             ),
           ),
-          SizedBox(height: 10.h),
+          SizedBox(height: 8.h),
           Row(
             children: [
               Expanded(
                 child: _HeroMetric(
                   icon: Icons.schedule_rounded,
-                  label: '最佳窗口',
+                  label: '窗口',
                   value: scenario.bestTime,
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 6.w),
               Expanded(
                 child: _HeroMetric(
                   icon: Icons.place_rounded,
-                  label: '推荐水域',
+                  label: '站位',
                   value: scenario.spotHint,
-                ),
-              ),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: _HeroMetric(
-                  icon: Icons.block_rounded,
-                  label: '不要做',
-                  value: scenario.avoid,
                 ),
               ),
             ],
           ),
-          SizedBox(height: 12.h),
+          SizedBox(height: 9.h),
           Row(
             children: [
               Expanded(
                 child: InkPrimaryButton(
-                  label: '开始作钓',
+                  label: '开始出钓',
                   icon: Icons.play_arrow_rounded,
                   color: scenario.accent,
                   onTap: onPrimary,
                 ),
               ),
-              SizedBox(width: 10.w),
+              SizedBox(width: 8.w),
               Expanded(
-                child: InkPrimaryButton(
-                  label: '装备方案',
-                  icon: Icons.inventory_2_rounded,
-                  color: InkPalette.reed,
+                child: InkSecondaryButton(
+                  label: '换钓点',
+                  icon: Icons.place_rounded,
+                  color: scenario.accent,
                   onTap: onPlan,
                 ),
               ),
@@ -1590,7 +2220,7 @@ class _FrostTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 5.h),
       decoration: BoxDecoration(
         color: InkPalette.white.withValues(alpha: 0.70),
         borderRadius: BorderRadius.circular(999),
@@ -1599,13 +2229,13 @@ class _FrostTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: InkPalette.pine, size: 14.w),
-          SizedBox(width: 4.w),
+          Icon(icon, color: InkPalette.pine, size: 13.w),
+          SizedBox(width: 3.w),
           Text(
             label,
             style: TextStyle(
               color: InkPalette.text,
-              fontSize: 12.sp,
+              fontSize: 11.sp,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1635,15 +2265,15 @@ class _DecisionScoreRing extends StatelessWidget {
       curve: Curves.easeOutCubic,
       builder: (context, value, _) {
         return Container(
-          width: 66.w,
-          height: 66.w,
+          width: 58.w,
+          height: 58.w,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
                 color: InkPalette.ink.withValues(alpha: 0.24),
-                blurRadius: 20,
-                offset: Offset(0, 8.h),
+                blurRadius: 16,
+                offset: Offset(0, 7.h),
               ),
             ],
           ),
@@ -1657,7 +2287,7 @@ class _DecisionScoreRing extends StatelessWidget {
                     '$score',
                     style: TextStyle(
                       color: InkPalette.white,
-                      fontSize: 22.sp,
+                      fontSize: 20.sp,
                       height: 1,
                       fontWeight: FontWeight.w900,
                     ),
@@ -1667,7 +2297,7 @@ class _DecisionScoreRing extends StatelessWidget {
                     label,
                     style: TextStyle(
                       color: InkPalette.white.withValues(alpha: 0.88),
-                      fontSize: 10.sp,
+                      fontSize: 9.5.sp,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -1739,10 +2369,10 @@ class _HeroMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 7.h),
+      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 6.h),
       decoration: BoxDecoration(
         color: InkPalette.ink.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(14.r),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: InkPalette.white.withValues(alpha: 0.30)),
       ),
       child: Column(
@@ -1750,8 +2380,8 @@ class _HeroMetric extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: InkPalette.white, size: 13.w),
-              SizedBox(width: 4.w),
+              Icon(icon, color: InkPalette.white, size: 12.w),
+              SizedBox(width: 3.w),
               Expanded(
                 child: Text(
                   label,
@@ -1759,21 +2389,21 @@ class _HeroMetric extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: InkPalette.white.withValues(alpha: 0.90),
-                    fontSize: 11.sp,
+                    fontSize: 10.sp,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 3.h),
+          SizedBox(height: 2.h),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.white,
-              fontSize: 12.sp,
+              fontSize: 11.sp,
               fontWeight: FontWeight.w900,
               shadows: const [Shadow(color: Color(0x99000000), blurRadius: 5)],
             ),
@@ -1876,23 +2506,11 @@ class _TodayPlanCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: 11.h),
-          _PlanMiniMetaRow(scenario: scenario),
-          SizedBox(height: 11.h),
-          for (var i = 0; i < scenario.steps.length; i++) ...[
-            _PlanStepRow(
-              step: scenario.steps[i],
-              index: i + 1,
-              isFirst: i == 0,
-              isLast: i == scenario.steps.length - 1,
-            ),
-            if (i != scenario.steps.length - 1) SizedBox(height: 9.h),
-          ],
-          SizedBox(height: 12.h),
           Row(
             children: [
               Expanded(
                 child: InkPrimaryButton(
-                  label: '开始计划',
+                  label: '查看计划',
                   icon: Icons.flag_rounded,
                   color: scenario.accent,
                   onTap: onOpenPlan,
@@ -1910,174 +2528,13 @@ class _TodayPlanCard extends StatelessWidget {
           ),
           SizedBox(height: 8.h),
           Text(
-            '止损规则：${last.title}，${last.subtitle}',
+            '止损：${last.title} · ${last.subtitle}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.cinnabar,
               fontSize: 11.5.sp,
               fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlanMiniMetaRow extends StatelessWidget {
-  const _PlanMiniMetaRow({required this.scenario});
-
-  final _FishingMockScenario scenario;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      (Icons.schedule_rounded, '窗口', scenario.bestTime, scenario.accent),
-      (Icons.place_rounded, '站位', scenario.spotHint, InkPalette.lake),
-      (Icons.inventory_2_rounded, '装备', scenario.gearShort, InkPalette.reed),
-    ];
-
-    return Row(
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: items[i].$4.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(13.r),
-                border: Border.all(color: items[i].$4.withValues(alpha: 0.12)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(items[i].$1, color: items[i].$4, size: 13.w),
-                      SizedBox(width: 4.w),
-                      Text(
-                        items[i].$2,
-                        style: TextStyle(
-                          color: InkPalette.muted,
-                          fontSize: 10.sp,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 3.h),
-                  Text(
-                    items[i].$3,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: InkPalette.text,
-                      fontSize: 11.5.sp,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (i != items.length - 1) SizedBox(width: 8.w),
-        ],
-      ],
-    );
-  }
-}
-
-class _PlanStepRow extends StatelessWidget {
-  const _PlanStepRow({
-    required this.step,
-    required this.index,
-    required this.isFirst,
-    required this.isLast,
-  });
-
-  final _PlanStep step;
-  final int index;
-  final bool isFirst;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(10.r),
-      decoration: BoxDecoration(
-        color: step.color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: step.color.withValues(alpha: 0.14)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32.w,
-            height: 32.w,
-            decoration: BoxDecoration(
-              color: step.color,
-              borderRadius: BorderRadius.circular(12.r),
-            ),
-            child: Center(
-              child: Text(
-                '$index',
-                style: TextStyle(
-                  color: InkPalette.white,
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: 10.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  step.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.text,
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 3.h),
-                Text(
-                  step.subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.muted,
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: 8.w),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 5.h),
-            decoration: BoxDecoration(
-              color: InkPalette.white.withValues(alpha: 0.78),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: step.color.withValues(alpha: 0.18)),
-            ),
-            child: Text(
-              isFirst
-                  ? '先做'
-                  : isLast
-                  ? '止损'
-                  : step.badge,
-              style: TextStyle(
-                color: step.color,
-                fontSize: 11.sp,
-                fontWeight: FontWeight.w900,
-              ),
             ),
           ),
         ],
@@ -2104,39 +2561,39 @@ class _CoreActionGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tuneAction = _CoreAction(
-      icon: Icons.tune_rounded,
-      title: '现场修正',
-      subtitle: '到水边先校准水色 / 风口 / 人流 / 鱼层',
-      badge: '到点必做',
-      metric: '4项',
+      icon: Icons.sensors_rounded,
+      title: '调整方案',
+      subtitle: '现场不一样时再修正',
+      badge: '出发前',
+      metric: '修正',
       color: InkPalette.lake,
       onTap: onTune,
     );
     final gearAction = _CoreAction(
-      icon: Icons.inventory_2_rounded,
+      icon: Icons.fact_check_rounded,
       title: '装备清单',
       subtitle: scenario.gearShort,
       badge: '出发前',
-      metric: '核对',
-      color: InkPalette.reed,
+      metric: '装备',
+      color: InkPalette.pine,
       onTap: onGear,
     );
     final catchAction = _CoreAction(
       icon: Icons.add_photo_alternate_rounded,
-      title: '记录鱼获',
-      subtitle: '拍照、鱼种、钓法与水情，反哺鱼情模型',
+      title: '记鱼获',
+      subtitle: '有收获再补一笔',
       badge: '钓后',
-      metric: '+经验',
+      metric: '报告',
       color: InkPalette.moss,
       onTap: onCatch,
     );
     final stages = [
       _CoreAction(
-        icon: Icons.near_me_rounded,
-        title: '导航',
-        subtitle: scenario.navigationHint,
-        badge: '路上',
-        metric: scenario.spotHint,
+        icon: Icons.play_arrow_rounded,
+        title: '去钓点',
+        subtitle: '按推荐窗口出发',
+        badge: '现在',
+        metric: scenario.bestTime,
         color: scenario.accent,
         onTap: onNavigate,
       ),
@@ -2150,16 +2607,6 @@ class _CoreActionGrid extends StatelessWidget {
         _CorePrimaryActionCard(scenario: scenario, onTap: onNavigate),
         SizedBox(height: 10.h),
         _CoreActionStageStrip(items: stages),
-        SizedBox(height: 10.h),
-        Row(
-          children: [
-            Expanded(child: _CoreActionTile(action: tuneAction)),
-            SizedBox(width: 10.w),
-            Expanded(child: _CoreActionTile(action: gearAction)),
-          ],
-        ),
-        SizedBox(height: 10.h),
-        _CoreActionTile(action: catchAction, wide: true),
       ],
     );
   }
@@ -2210,7 +2657,7 @@ class _CorePrimaryActionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '下一步：${scenario.primaryAction}',
+                        '下一步：去钓点',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -2221,7 +2668,7 @@ class _CorePrimaryActionCard extends StatelessWidget {
                       ),
                       SizedBox(height: 4.h),
                       Text(
-                        '${scenario.location} · ${scenario.navigationHint}',
+                        '${scenario.bestTime} · ${scenario.spotHint}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -2265,16 +2712,16 @@ class _CorePrimaryActionCard extends StatelessWidget {
                 Expanded(
                   child: _CorePrimaryMeta(
                     icon: Icons.place_rounded,
-                    label: '站位',
+                    label: '钓点',
                     value: scenario.spotHint,
                   ),
                 ),
                 SizedBox(width: 8.w),
                 Expanded(
                   child: _CorePrimaryMeta(
-                    icon: scenario.safetyIcon,
-                    label: '安全',
-                    value: scenario.safetyLevel,
+                    icon: Icons.set_meal_rounded,
+                    label: '打法',
+                    value: _scenarioMethod(scenario),
                   ),
                 ),
               ],
@@ -2404,93 +2851,6 @@ class _CoreActionStageItem extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _CoreActionTile extends StatelessWidget {
-  const _CoreActionTile({required this.action, this.wide = false});
-
-  final _CoreAction action;
-  final bool wide;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkCard(
-      padding: EdgeInsets.all(12.r),
-      onTap: action.onTap,
-      child: Row(
-        children: [
-          InkIconMark(icon: action.icon, color: action.color, size: 42),
-          SizedBox(width: 10.w),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  action.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.text,
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  action.subtitle,
-                  maxLines: wide ? 2 : 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.muted,
-                    fontSize: 11.5.sp,
-                    height: 1.28,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: 8.w),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                decoration: BoxDecoration(
-                  color: action.color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: action.color.withValues(alpha: 0.12),
-                  ),
-                ),
-                child: Text(
-                  action.badge,
-                  style: TextStyle(
-                    color: action.color,
-                    fontSize: 10.5.sp,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              SizedBox(height: 6.h),
-              Text(
-                action.metric,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: InkPalette.text,
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -2676,25 +3036,35 @@ class _FishMethodCard extends StatelessWidget {
 }
 
 class _SpotRecommendationList extends StatelessWidget {
-  const _SpotRecommendationList({required this.scenario});
+  const _SpotRecommendationList({
+    required this.scenario,
+    required this.onEnqueueVerification,
+  });
 
   final _FishingMockScenario scenario;
+  final Future<String> Function(_SpotMock spot) onEnqueueVerification;
 
   @override
   Widget build(BuildContext context) {
+    final spots = scenario.spots.take(1).toList(growable: false);
     return Column(
       children: [
-        for (var i = 0; i < scenario.spots.length; i++) ...[
+        for (var i = 0; i < spots.length; i++) ...[
           _SpotCard(
-            spot: scenario.spots[i],
+            spot: spots[i],
+            target: scenario.target,
             accent: scenario.accent,
             visualKind: i.isEven
                 ? InkVisualTileKind.spot
                 : InkVisualTileKind.map,
-            onTap: () =>
-                _showSpotDetailSheet(context, scenario, scenario.spots[i]),
+            onTap: () => _showSpotDetailSheet(
+              context,
+              scenario,
+              spots[i],
+              onEnqueueVerification: onEnqueueVerification,
+            ),
           ),
-          if (i != scenario.spots.length - 1) SizedBox(height: 10.h),
+          if (i != spots.length - 1) SizedBox(height: 10.h),
         ],
       ],
     );
@@ -2704,18 +3074,23 @@ class _SpotRecommendationList extends StatelessWidget {
 class _SpotCard extends StatelessWidget {
   const _SpotCard({
     required this.spot,
+    required this.target,
     required this.accent,
     required this.visualKind,
     required this.onTap,
   });
 
   final _SpotMock spot;
+  final String target;
   final Color accent;
   final InkVisualTileKind visualKind;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final bookable = _spotBookable(spot);
+    final rating = (spot.rating ?? (spot.score / 20).clamp(0, 5))
+        .toStringAsFixed(1);
     return InkCard(
       padding: EdgeInsets.all(10.r),
       onTap: onTap,
@@ -2771,69 +3146,89 @@ class _SpotCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    _HomeSpotTag(
+                      label: bookable ? '可预约' : '看路线',
+                      color: bookable ? InkPalette.pine : InkPalette.lake,
+                    ),
+                  ],
+                ),
+                SizedBox(height: 5.h),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.near_me_rounded,
+                      color: InkPalette.muted,
+                      size: 13.w,
+                    ),
+                    SizedBox(width: 3.w),
                     Text(
                       spot.distance,
                       style: TextStyle(
                         color: InkPalette.muted,
-                        fontSize: 11.5.sp,
+                        fontSize: 10.8.sp,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ],
-                ),
-                SizedBox(height: 7.h),
-                Wrap(
-                  spacing: 5.w,
-                  runSpacing: 5.h,
-                  children: spot.tags
-                      .map(
-                        (tag) => Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 7.w,
-                            vertical: 3.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: accent.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            tag,
-                            style: TextStyle(
-                              color: accent,
-                              fontSize: 10.5.sp,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-                SizedBox(height: 8.h),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: spot.score / 100,
-                          minHeight: 6.h,
-                          color: accent,
-                          backgroundColor: InkPalette.line.withValues(
-                            alpha: 0.55,
-                          ),
-                        ),
-                      ),
-                    ),
                     SizedBox(width: 8.w),
+                    Icon(
+                      Icons.star_rounded,
+                      color: InkPalette.reed,
+                      size: 13.w,
+                    ),
+                    SizedBox(width: 3.w),
                     Text(
-                      '${spot.score}分',
+                      rating,
                       style: TextStyle(
-                        color: accent,
-                        fontSize: 12.sp,
+                        color: InkPalette.text,
+                        fontSize: 10.8.sp,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
+                    SizedBox(width: 8.w),
+                    Expanded(
+                      child: Text(
+                        _spotPriceLabel(spot),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: InkPalette.muted,
+                          fontSize: 10.8.sp,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
                   ],
+                ),
+                SizedBox(height: 6.h),
+                Wrap(
+                  spacing: 5.w,
+                  runSpacing: 5.h,
+                  children: [
+                    _HomeSpotTag(label: target, color: InkPalette.lake),
+                    for (final tag in spot.tags.take(3))
+                      _HomeSpotTag(label: tag, color: accent),
+                  ],
+                ),
+                SizedBox(height: 7.h),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: accent.withValues(alpha: 0.11)),
+                  ),
+                  child: Text(
+                    _spotReason(spot, target),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: InkPalette.text,
+                      fontSize: 11.sp,
+                      height: 1.2,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -2842,6 +3237,60 @@ class _SpotCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HomeSpotTag extends StatelessWidget {
+  const _HomeSpotTag({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.10)),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 10.2.sp,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+bool _spotBookable(_SpotMock spot) {
+  if (spot.bookable != null) return spot.bookable!;
+  return !spot.tags.contains('野钓') && !spot.tags.contains('安全');
+}
+
+String _spotPriceLabel(_SpotMock spot) {
+  if (spot.priceLabel != null && spot.priceLabel!.isNotEmpty) {
+    return spot.priceLabel!;
+  }
+  if (!_spotBookable(spot)) return '免费水域 · 注意安全';
+  if (spot.tags.contains('亲子') || spot.title.contains('露营')) {
+    return '¥98起 · 会员¥88';
+  }
+  if (spot.tags.contains('晚口') || spot.tags.contains('夜钓')) {
+    return '¥88起 · 会员¥78';
+  }
+  return '¥68起 · 会员¥58';
+}
+
+String _spotReason(_SpotMock spot, String target) {
+  if (spot.reason != null && spot.reason!.isNotEmpty) return spot.reason!;
+  final firstTag = spot.tags.isEmpty ? '鱼情' : spot.tags.first;
+  return '今日推荐：$firstTag条件好，适合主攻$target';
 }
 
 class _FeaturedCatchPanel extends StatelessWidget {
@@ -3203,8 +3652,214 @@ void _showScenarioDetailSheet(
           icon: item.icon,
           title: item.title,
           subtitle: item.subtitle,
+          trailing: item.trailing.isEmpty ? '查看' : item.trailing,
           color: item.color,
         ),
+    ],
+  );
+}
+
+void _showLocationSheet(
+  BuildContext context,
+  _FishingMockScenario scenario, {
+  required List<LocalTrialCity> cities,
+  required String selectedCityCode,
+  required LocalCityContext? cityContext,
+  required ValueChanged<String> onCitySelected,
+  required Future<void> Function() onRefresh,
+}) {
+  final cityActions = [
+    for (final city in cities)
+      InkSheetAction(
+        icon: Icons.location_city_rounded,
+        title: city.code == selectedCityCode ? '${city.name}（当前）' : city.name,
+        subtitle: city.strategy,
+        trailing: city.code == selectedCityCode ? '当前' : '切换',
+        color: city.code == selectedCityCode
+            ? scenario.accent
+            : InkPalette.lake,
+        onTap: city.code == selectedCityCode
+            ? () => AppFeedback.showMessage(context, '当前已是${city.name}')
+            : () => onCitySelected(city.code),
+      ),
+  ];
+  showInkActionSheet(
+    context,
+    title: '钓点与定位',
+    subtitle: '${scenario.location} · ${scenario.updateText}',
+    icon: Icons.location_on_rounded,
+    color: scenario.accent,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: InkMetric(
+              value: '${scenario.score}',
+              label: '适钓指数',
+              icon: Icons.auto_graph_rounded,
+              color: scenario.accent,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: InkMetric(
+              value: scenario.bestTime,
+              label: '窗口',
+              icon: Icons.schedule_rounded,
+              color: InkPalette.lake,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: InkMetric(
+              value: scenario.spotHint,
+              label: '推荐水域',
+              icon: Icons.place_rounded,
+              color: InkPalette.moss,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 10.h),
+      InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: InkPalette.paper.withValues(alpha: 0.72),
+        child: InkInfoRow(
+          icon: Icons.my_location_rounded,
+          title: scenario.location,
+          subtitle: scenario.updateText,
+          color: scenario.accent,
+        ),
+      ),
+      if (cityContext != null) ...[
+        SizedBox(height: 10.h),
+        InkCard(
+          padding: EdgeInsets.all(11.r),
+          color: InkPalette.paper.withValues(alpha: 0.72),
+          child: InkInfoRow(
+            icon: Icons.verified_user_rounded,
+            title: '${cityContext.city.name} · ${cityContext.city.role}',
+            subtitle: cityContext.city.complianceSummary,
+            color: InkPalette.reed,
+          ),
+        ),
+      ],
+    ],
+    actions: [
+      InkSheetAction(
+        icon: Icons.gps_fixed_rounded,
+        title: '刷新定位与鱼情',
+        subtitle: '重新获取位置，并重算天气、水情和适钓指数',
+        trailing: '刷新',
+        color: scenario.accent,
+        onTap: () {
+          AppFeedback.showMessage(context, '正在刷新定位与适钓指数');
+          unawaited(
+            onRefresh().then((_) {
+              if (!context.mounted) return;
+              AppFeedback.showMessage(context, '钓点和适钓指数已刷新');
+            }),
+          );
+        },
+      ),
+      ...cityActions,
+      InkSheetAction(
+        icon: Icons.map_rounded,
+        title: '去钓场选择',
+        subtitle: '查看附近钓场、预约钓位和活动',
+        trailing: '选择',
+        color: InkPalette.lake,
+        onTap: () => context.go(_exploreRoute(scenario, intent: 'spot')),
+      ),
+      InkSheetAction(
+        icon: Icons.bookmark_added_rounded,
+        title: '保留当前钓点',
+        subtitle: '继续使用当前钓点生成作钓建议',
+        trailing: '保留',
+        color: InkPalette.moss,
+        onTap: () => AppFeedback.showMessage(context, '已保留当前钓点'),
+      ),
+    ],
+  );
+}
+
+void _showStartFishingSheet(
+  BuildContext context,
+  _FishingMockScenario scenario,
+) {
+  showInkActionSheet(
+    context,
+    title: '开始作钓',
+    subtitle: '按顺序完成导航、设备同步、装备检查和现场计划',
+    icon: Icons.play_arrow_rounded,
+    color: scenario.accent,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: InkMetric(
+              value: scenario.bestTime,
+              label: '最佳窗口',
+              icon: Icons.schedule_rounded,
+              color: scenario.accent,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: InkMetric(
+              value: scenario.target,
+              label: '主攻鱼种',
+              icon: Icons.set_meal_rounded,
+              color: InkPalette.lake,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 10.h),
+      InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: InkPalette.paper.withValues(alpha: 0.72),
+        child: InkInfoRow(
+          icon: Icons.route_rounded,
+          title: '下一步：${scenario.primaryAction}',
+          subtitle: '${scenario.location} · ${scenario.navigationHint}',
+          color: scenario.accent,
+        ),
+      ),
+    ],
+    actions: [
+      InkSheetAction(
+        icon: Icons.near_me_rounded,
+        title: '去钓场 / 开始导航',
+        subtitle: '查看停车点、岸边路线和安全提醒',
+        trailing: '导航',
+        color: scenario.accent,
+        onTap: () => context.go(_exploreRoute(scenario, intent: 'route')),
+      ),
+      InkSheetAction(
+        icon: Icons.sync_rounded,
+        title: '同步智能设备',
+        subtitle: '刷新鱼漂、钓箱、钓台和钓伞的状态',
+        trailing: '同步',
+        color: InkPalette.lake,
+        onTap: () => _showDeviceSyncSheet(context, scenario),
+      ),
+      InkSheetAction(
+        icon: Icons.checklist_rounded,
+        title: '出发前检查',
+        subtitle: scenario.gearChecklist,
+        trailing: '检查',
+        color: InkPalette.reed,
+        onTap: () => _showGearChecklistSheet(context, scenario),
+      ),
+      InkSheetAction(
+        icon: Icons.flag_rounded,
+        title: '查看作钓计划',
+        subtitle: '开局、换层、止损和安全事项',
+        trailing: '计划',
+        color: InkPalette.moss,
+        onTap: () => _showPlanSheet(context, scenario),
+      ),
     ],
   );
 }
@@ -5174,6 +5829,7 @@ void _showGearSheet(BuildContext context, _FishingMockScenario scenario) {
         icon: Icons.checklist_rounded,
         title: '出发前检查',
         subtitle: scenario.gearChecklist,
+        trailing: '检查',
         color: InkPalette.pine,
         onTap: () => _showGearChecklistSheet(context, scenario),
       ),
@@ -5181,8 +5837,9 @@ void _showGearSheet(BuildContext context, _FishingMockScenario scenario) {
         icon: Icons.storefront_rounded,
         title: '缺装备去商城',
         subtitle: '按当前钓法筛选竿、线、饵、配件',
+        trailing: '商城',
         color: InkPalette.reed,
-        onTap: () => context.push(AppRouteNames.mall),
+        onTap: () => context.go(_mallRoute(scenario, intent: 'gear')),
       ),
     ],
   );
@@ -5474,8 +6131,10 @@ class _GearChecklistRow extends StatelessWidget {
 void _showSpotDetailSheet(
   BuildContext context,
   _FishingMockScenario scenario,
-  _SpotMock spot,
-) {
+  _SpotMock spot, {
+  required Future<String> Function(_SpotMock spot) onEnqueueVerification,
+}) {
+  final hasMapUrls = spot.navigationUrls.isNotEmpty;
   showInkActionSheet(
     context,
     title: spot.title,
@@ -5483,20 +6142,261 @@ void _showSpotDetailSheet(
     icon: Icons.place_rounded,
     color: scenario.accent,
     showLandscape: true,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: InkMetric(
+              value: spot.distance,
+              label: '路线',
+              icon: Icons.near_me_rounded,
+              color: scenario.accent,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: InkMetric(
+              value: (spot.rating ?? (spot.score / 20)).toStringAsFixed(1),
+              label: '评分',
+              icon: Icons.star_rounded,
+              color: InkPalette.reed,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: InkMetric(
+              value: _spotPriceLabel(spot),
+              label: '价格',
+              icon: Icons.local_activity_rounded,
+              color: InkPalette.lake,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 10.h),
+      InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: InkPalette.paper.withValues(alpha: 0.72),
+        child: InkInfoRow(
+          icon: Icons.auto_awesome_rounded,
+          title: '今日推荐理由',
+          subtitle: _spotReason(spot, scenario.target),
+          color: scenario.accent,
+        ),
+      ),
+      SizedBox(height: 10.h),
+      InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: InkPalette.paper.withValues(alpha: 0.72),
+        child: InkInfoRow(
+          icon: Icons.fact_check_rounded,
+          title: spot.verificationLabel ?? '运营核验',
+          subtitle: spot.verificationSummary ?? '试点钓场信息待运营复核。',
+          color: InkPalette.moss,
+        ),
+      ),
+      if (spot.verificationItems.isNotEmpty) ...[
+        SizedBox(height: 8.h),
+        for (final item in spot.verificationItems.take(3)) ...[
+          InkCard(
+            padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 9.h),
+            color: InkPalette.white.withValues(alpha: 0.70),
+            child: InkInfoRow(
+              icon: Icons.check_circle_outline_rounded,
+              title: item,
+              subtitle: '正式上线前继续补充商户、价格、停车和现场照片',
+              color: InkPalette.pine,
+            ),
+          ),
+          SizedBox(height: 7.h),
+        ],
+      ],
+      InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: InkPalette.paper.withValues(alpha: 0.72),
+        child: InkInfoRow(
+          icon: Icons.gpp_maybe_rounded,
+          title: spot.complianceLabel ?? '合规提示',
+          subtitle: spot.complianceSummary ?? '商业钓场优先推荐，天然水域请以当地公告为准。',
+          color: InkPalette.reed,
+        ),
+      ),
+    ],
     actions: [
       InkSheetAction(
         icon: Icons.near_me_rounded,
-        title: '开始导航',
-        subtitle: '查看停车点、岸边路线和安全提醒',
+        title: hasMapUrls ? '高德地图导航' : '开始导航',
+        subtitle: hasMapUrls ? '调起高德地图或浏览器路线页' : '查看停车点、岸边路线和安全提醒',
+        trailing: hasMapUrls ? '高德' : '导航',
         color: scenario.accent,
-        onTap: () => context.go(AppRouteNames.explore),
+        onTap: () => hasMapUrls
+            ? unawaited(_openMapUrl(context, spot, 'amap'))
+            : context.go(
+                _exploreRoute(scenario, intent: 'route', spot: spot.title),
+              ),
+      ),
+      if (hasMapUrls)
+        InkSheetAction(
+          icon: Icons.map_rounded,
+          title: 'Apple Maps 导航',
+          subtitle: 'iPhone 用户可直接打开系统地图路线',
+          trailing: 'Apple',
+          color: InkPalette.lake,
+          onTap: () => unawaited(_openMapUrl(context, spot, 'apple')),
+        ),
+      InkSheetAction(
+        icon: Icons.assignment_turned_in_rounded,
+        title: '查看核验清单',
+        subtitle: spot.verificationSummary ?? '营业、价格、鱼种、路线和合规边界',
+        trailing: '核验',
+        color: InkPalette.moss,
+        onTap: () => _showVenueVerificationSheet(
+          context,
+          scenario,
+          spot,
+          onEnqueueVerification: onEnqueueVerification,
+        ),
       ),
       InkSheetAction(
         icon: Icons.bookmark_add_rounded,
         title: '收藏钓点',
         subtitle: '同步到我的收藏钓点',
+        trailing: '收藏',
         color: InkPalette.moss,
         onTap: () => AppFeedback.showMessage(context, '${spot.title} 已收藏'),
+      ),
+    ],
+  );
+}
+
+Future<void> _openMapUrl(
+  BuildContext context,
+  _SpotMock spot,
+  String provider,
+) async {
+  final url = spot.navigationUrls[provider];
+  final uri = url == null ? null : Uri.tryParse(url);
+  if (uri == null) {
+    AppFeedback.showMessage(context, '暂未配置${spot.title}的导航链接');
+    return;
+  }
+
+  try {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!context.mounted) return;
+    AppFeedback.showMessage(
+      context,
+      opened
+          ? '已打开${provider == 'apple' ? 'Apple Maps' : '高德地图'}导航'
+          : '地图暂时无法打开',
+    );
+  } catch (_) {
+    if (!context.mounted) return;
+    AppFeedback.showMessage(context, '地图暂时无法打开，请稍后重试');
+  }
+}
+
+void _showVenueVerificationSheet(
+  BuildContext context,
+  _FishingMockScenario scenario,
+  _SpotMock spot, {
+  required Future<String> Function(_SpotMock spot) onEnqueueVerification,
+}) {
+  showInkActionSheet(
+    context,
+    title: '${spot.title} · 核验清单',
+    subtitle: spot.verificationSummary ?? '正式上线前需要运营确认营业、价格、路线和合规边界。',
+    icon: Icons.assignment_turned_in_rounded,
+    color: InkPalette.moss,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: InkMetric(
+              value: spot.verificationLabel ?? '待核验',
+              label: '核验状态',
+              icon: Icons.verified_rounded,
+              color: InkPalette.moss,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: InkMetric(
+              value: spot.complianceLabel ?? '合规提示',
+              label: '合规状态',
+              icon: Icons.gpp_maybe_rounded,
+              color: InkPalette.reed,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 10.h),
+      if (spot.verificationItems.isEmpty)
+        InkCard(
+          padding: EdgeInsets.all(11.r),
+          color: InkPalette.paper.withValues(alpha: 0.72),
+          child: const InkInfoRow(
+            icon: Icons.info_outline_rounded,
+            title: '核验清单待补充',
+            subtitle: '当前为旧演示钓点，P1 优先核验南京、盐城商业钓场。',
+            color: InkPalette.lake,
+          ),
+        )
+      else
+        for (final item in spot.verificationItems) ...[
+          InkCard(
+            padding: EdgeInsets.all(11.r),
+            color: InkPalette.paper.withValues(alpha: 0.72),
+            child: InkInfoRow(
+              icon: Icons.checklist_rounded,
+              title: item,
+              subtitle: '负责人、现场照片、价格和路线在 P1 运营后台继续完善',
+              color: InkPalette.pine,
+            ),
+          ),
+          SizedBox(height: 8.h),
+        ],
+      InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: InkPalette.paper.withValues(alpha: 0.72),
+        child: InkInfoRow(
+          icon: Icons.gpp_maybe_rounded,
+          title: spot.complianceLabel ?? '合规边界',
+          subtitle: spot.complianceSummary ?? '天然水域不做强推荐，商业钓场上线前仍需核对当地公告。',
+          color: InkPalette.reed,
+        ),
+      ),
+    ],
+    actions: [
+      if (spot.navigationUrls.containsKey('amap'))
+        InkSheetAction(
+          icon: Icons.near_me_rounded,
+          title: '用高德继续核对路线',
+          subtitle: '现场核验停车点、入口和到水边路线',
+          trailing: '高德',
+          color: scenario.accent,
+          onTap: () => unawaited(_openMapUrl(context, spot, 'amap')),
+        ),
+      InkSheetAction(
+        icon: Icons.bookmark_added_rounded,
+        title: '加入运营核验队列',
+        subtitle: '标记为 P1 需要运营继续补齐的钓场',
+        trailing: '加入',
+        color: InkPalette.moss,
+        onTap: () {
+          AppFeedback.showMessage(context, '正在加入运营核验队列');
+          unawaited(
+            onEnqueueVerification(spot)
+                .then((message) {
+                  if (!context.mounted) return;
+                  AppFeedback.showMessage(context, message);
+                })
+                .catchError((Object _) {
+                  if (!context.mounted) return;
+                  AppFeedback.showMessage(context, '核验队列暂时不可用，请稍后重试');
+                }),
+          );
+        },
       ),
     ],
   );
@@ -5505,6 +6405,7 @@ void _showSpotDetailSheet(
 void _showNotificationSheet(
   BuildContext context,
   _FishingMockScenario scenario,
+  List<IotDeviceState> devices,
 ) {
   showInkActionSheet(
     context,
@@ -5517,6 +6418,7 @@ void _showNotificationSheet(
         icon: scenario.safetyIcon,
         title: scenario.safetyTitle,
         subtitle: scenario.safetySubtitle,
+        trailing: '查看',
         color: scenario.safetyColor,
         onTap: () => _showSafetySheet(context, scenario),
       ),
@@ -5524,8 +6426,9 @@ void _showNotificationSheet(
         icon: Icons.sensors_rounded,
         title: scenario.deviceTitle,
         subtitle: scenario.deviceSubtitle,
+        trailing: '设备',
         color: scenario.accent,
-        onTap: () => _showDeviceSheet(context, scenario),
+        onTap: () => _showDeviceSheet(context, scenario, devices),
       ),
     ],
   );
@@ -5605,13 +6508,15 @@ void _showSafetySheet(BuildContext context, _FishingMockScenario scenario) {
         icon: Icons.map_rounded,
         title: '查看安全路线',
         subtitle: '跳转钓点地图，优先看停车点和撤离路线',
+        trailing: '路线',
         color: scenario.accent,
-        onTap: () => context.go(AppRouteNames.explore),
+        onTap: () => context.go(_exploreRoute(scenario, intent: 'safety')),
       ),
       InkSheetAction(
         icon: Icons.notifications_active_rounded,
         title: '保留提醒',
         subtitle: '到窗口前 30 分钟提醒装备和安全事项',
+        trailing: '保留',
         color: InkPalette.moss,
         onTap: () => AppFeedback.showMessage(context, '已保留出钓安全提醒'),
       ),
@@ -5711,6 +6616,7 @@ void _showDeviceSheet(
         icon: Icons.sync_rounded,
         title: '立即同步',
         subtitle: '刷新设备最新水情',
+        trailing: '同步',
         color: InkPalette.lake,
         onTap: () => _showDeviceSyncSheet(context, scenario),
       ),
@@ -5718,8 +6624,157 @@ void _showDeviceSheet(
         icon: Icons.settings_input_antenna_rounded,
         title: '设备校准',
         subtitle: '校准水深、水温和信号',
+        trailing: '校准',
         color: InkPalette.moss,
         onTap: () => _showDeviceCalibrationSheet(context, scenario),
+      ),
+      InkSheetAction(
+        icon: Icons.build_circle_outlined,
+        title: '售后服务',
+        subtitle: '保修、维修和绑定问题统一处理',
+        trailing: '服务',
+        color: InkPalette.lake,
+        onTap: () => _showDeviceAfterSalesSheet(context, scenario),
+      ),
+    ],
+  );
+}
+
+void _showSingleDeviceSheet(
+  BuildContext context,
+  _FishingMockScenario scenario,
+  IotDeviceState device, {
+  required VoidCallback onToggle,
+}) {
+  final color = _iotDeviceColor(device, scenario.accent);
+  showInkActionSheet(
+    context,
+    title: device.title,
+    subtitle:
+        '${device.sceneRole} · ${device.workingState} · ${device.riskLabel}',
+    icon: _iotDeviceIcon(device.type),
+    color: color,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: InkMetric(
+              value: device.telemetryValue,
+              label: device.telemetryLabel,
+              icon: Icons.monitor_heart_rounded,
+              color: color,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: InkMetric(
+              value: '${device.batteryLevel}%',
+              label: '电量',
+              icon: Icons.battery_charging_full_rounded,
+              color: InkPalette.moss,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: InkMetric(
+              value: '${device.signalLevel}%',
+              label: '信号',
+              icon: Icons.network_check_rounded,
+              color: InkPalette.lake,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 10.h),
+      InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: InkPalette.paper.withValues(alpha: 0.72),
+        child: InkInfoRow(
+          icon: Icons.tips_and_updates_rounded,
+          title: '设备建议',
+          subtitle: device.actionHint,
+          color: color,
+        ),
+      ),
+    ],
+    actions: [
+      InkSheetAction(
+        icon: Icons.sync_rounded,
+        title: '同步设备数据',
+        subtitle: '刷新设备在线状态、遥测数据和告警',
+        trailing: '同步',
+        color: InkPalette.lake,
+        onTap: () => _showDeviceSyncSheet(context, scenario),
+      ),
+      InkSheetAction(
+        icon: Icons.settings_input_antenna_rounded,
+        title: '设备校准',
+        subtitle: '校准水深、水温和信号阈值',
+        trailing: '校准',
+        color: InkPalette.moss,
+        onTap: () => _showDeviceCalibrationSheet(context, scenario),
+      ),
+      InkSheetAction(
+        icon: device.isActive
+            ? Icons.pause_circle_outline_rounded
+            : Icons.play_circle_outline_rounded,
+        title: device.isActive ? '切到待机' : '启动设备',
+        subtitle: device.isActive ? '暂停实时提醒，保留设备绑定' : '恢复设备在线监测',
+        trailing: '切换',
+        color: color,
+        onTap: onToggle,
+      ),
+    ],
+  );
+}
+
+void _showDeviceAfterSalesSheet(
+  BuildContext context,
+  _FishingMockScenario scenario,
+) {
+  showInkActionSheet(
+    context,
+    title: '设备售后服务',
+    subtitle: '保修、维修进度、固件问题和绑定问题统一处理',
+    icon: Icons.build_circle_outlined,
+    color: InkPalette.lake,
+    children: [
+      InkCard(
+        padding: EdgeInsets.all(11.r),
+        color: InkPalette.paper.withValues(alpha: 0.72),
+        child: InkInfoRow(
+          icon: Icons.verified_user_rounded,
+          title: '江湖钓客智能装备服务',
+          subtitle:
+              '${scenario.deviceTitle} · ${scenario.deviceState} · 支持远程排查',
+          color: scenario.accent,
+        ),
+      ),
+    ],
+    actions: [
+      InkSheetAction(
+        icon: Icons.health_and_safety_rounded,
+        title: '设备保修',
+        subtitle: '查看保修状态和延保权益',
+        trailing: '查看',
+        color: InkPalette.moss,
+        onTap: () => AppFeedback.showMessage(context, '设备保修入口已预留'),
+      ),
+      InkSheetAction(
+        icon: Icons.manage_history_rounded,
+        title: '维修进度',
+        subtitle: '查询已提交的维修单状态',
+        trailing: '查询',
+        color: InkPalette.lake,
+        onTap: () => AppFeedback.showMessage(context, '维修进度入口已预留'),
+      ),
+      InkSheetAction(
+        icon: Icons.support_agent_rounded,
+        title: '联系设备客服',
+        subtitle: '处理固件升级、绑定异常和配件问题',
+        trailing: '客服',
+        color: InkPalette.reed,
+        onTap: () => AppFeedback.showMessage(context, '设备客服入口已预留'),
       ),
     ],
   );
@@ -5816,29 +6871,60 @@ void _showDeviceSyncSheet(BuildContext context, _FishingMockScenario scenario) {
   );
 }
 
-class _DeviceSyncSheet extends StatefulWidget {
+class _DeviceSyncSheet extends ConsumerStatefulWidget {
   const _DeviceSyncSheet({required this.scenario});
 
   final _FishingMockScenario scenario;
 
   @override
-  State<_DeviceSyncSheet> createState() => _DeviceSyncSheetState();
+  ConsumerState<_DeviceSyncSheet> createState() => _DeviceSyncSheetState();
 }
 
-class _DeviceSyncSheetState extends State<_DeviceSyncSheet> {
+class _DeviceSyncSheetState extends ConsumerState<_DeviceSyncSheet> {
   bool _syncing = true;
+  bool? _fromApi;
+  String? _message;
 
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 880), () {
+    unawaited(_syncDevices());
+  }
+
+  Future<void> _syncDevices() async {
+    try {
+      final fromApi = await ref
+          .read(iotDevicesProvider.notifier)
+          .refreshFromApi();
+      final loadState = ref.read(iotDeviceLoadStateProvider);
       if (!mounted) return;
-      setState(() => _syncing = false);
-    });
+      setState(() {
+        _syncing = false;
+        _fromApi = fromApi;
+        _message = loadState.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _syncing = false;
+        _fromApi = false;
+        _message = '同步失败，已保留当前设备快照';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final summary = ref.watch(iotDeviceSummaryProvider);
+    final title = _syncing
+        ? '正在同步设备'
+        : (_fromApi == true ? '设备同步完成' : '已启用本地设备快照');
+    final subtitle = _syncing
+        ? '正在读取在线状态、遥测数据、电量和告警'
+        : (_fromApi == true
+              ? '已从后端刷新设备数据，首页摘要同步更新'
+              : (_message ?? '后端暂不可用，已保留本地设备快照'));
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -5872,7 +6958,7 @@ class _DeviceSyncSheetState extends State<_DeviceSyncSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _syncing ? '正在同步设备' : '设备同步完成',
+                          title,
                           style: TextStyle(
                             color: InkPalette.text,
                             fontSize: 17.sp,
@@ -5881,7 +6967,7 @@ class _DeviceSyncSheetState extends State<_DeviceSyncSheet> {
                         ),
                         SizedBox(height: 3.h),
                         Text(
-                          _syncing ? '正在读取水温、水深、电量和信号强度' : '已刷新为最新水情，推荐可继续使用',
+                          subtitle,
                           style: TextStyle(
                             color: InkPalette.muted,
                             fontSize: 12.sp,
@@ -5903,30 +6989,28 @@ class _DeviceSyncSheetState extends State<_DeviceSyncSheet> {
                         children: [
                           Expanded(
                             child: InkMetric(
-                              value: widget.scenario.depth,
-                              label: '水深',
-                              icon: Icons.height_rounded,
+                              value:
+                                  '${summary.onlineCount}/${summary.totalCount}',
+                              label: '在线设备',
+                              icon: Icons.sensors_rounded,
                               color: InkPalette.lake,
                             ),
                           ),
                           SizedBox(width: 8.w),
                           Expanded(
                             child: InkMetric(
-                              value: widget.scenario.waterTemp.replaceAll(
-                                '水温 ',
-                                '',
-                              ),
-                              label: '水温',
-                              icon: Icons.water_drop_rounded,
+                              value: '${summary.lowestBattery}%',
+                              label: '最低电量',
+                              icon: Icons.battery_charging_full_rounded,
                               color: widget.scenario.accent,
                             ),
                           ),
                           SizedBox(width: 8.w),
                           Expanded(
                             child: InkMetric(
-                              value: widget.scenario.deviceState,
-                              label: '状态',
-                              icon: Icons.sensors_rounded,
+                              value: '${summary.warningCount}',
+                              label: '需关注',
+                              icon: Icons.warning_amber_rounded,
                               color: InkPalette.moss,
                             ),
                           ),
@@ -5941,7 +7025,10 @@ class _DeviceSyncSheetState extends State<_DeviceSyncSheet> {
                   color: widget.scenario.accent,
                   onTap: () {
                     Navigator.of(context).pop();
-                    AppFeedback.showMessage(context, '设备水情已同步');
+                    AppFeedback.showMessage(
+                      context,
+                      _fromApi == true ? '设备数据已从后端同步' : '后端不可用，已使用本地设备快照',
+                    );
                   },
                 ),
               ],
@@ -6294,16 +7381,38 @@ class _FishMethod {
 
 class _SpotMock {
   const _SpotMock({
+    this.venueId,
     required this.title,
     required this.distance,
     required this.tags,
     required this.score,
+    this.rating,
+    this.priceLabel,
+    this.reason,
+    this.bookable,
+    this.complianceLabel,
+    this.complianceSummary,
+    this.verificationLabel,
+    this.verificationSummary,
+    this.verificationItems = const [],
+    this.navigationUrls = const {},
   });
 
+  final String? venueId;
   final String title;
   final String distance;
   final List<String> tags;
   final int score;
+  final double? rating;
+  final String? priceLabel;
+  final String? reason;
+  final bool? bookable;
+  final String? complianceLabel;
+  final String? complianceSummary;
+  final String? verificationLabel;
+  final String? verificationSummary;
+  final List<String> verificationItems;
+  final Map<String, String> navigationUrls;
 }
 
 class _CoreAction {
@@ -6324,6 +7433,36 @@ class _CoreAction {
   final String metric;
   final Color color;
   final VoidCallback onTap;
+}
+
+class _HomeFunctionAction {
+  const _HomeFunctionAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+}
+
+class _HomePreviewItem {
+  const _HomePreviewItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
 }
 
 const _mockScenarios = [
@@ -6390,22 +7529,22 @@ const _mockScenarios = [
     evidence: [
       _EvidenceItem(
         icon: Icons.air_rounded,
-        title: '2 级微风，适合搜索',
-        subtitle: '有风纹，浅滩外沿更容易聚鱼',
+        title: '风不大，适合沿浅滩慢搜',
+        subtitle: '有一点风纹，外沿更容易聚鱼',
         trailing: '+8',
         color: InkPalette.pine,
       ),
       _EvidenceItem(
         icon: Icons.water_drop_rounded,
-        title: '水色微浑，亮色更醒目',
-        subtitle: '优先银色亮片，弱口再换米诺',
+        title: '水有点浑，亮片更醒目',
+        subtitle: '优先银白亮片，弱口再换米诺',
         trailing: '+6',
         color: InkPalette.lake,
       ),
       _EvidenceItem(
         icon: Icons.history_rounded,
-        title: '近 7 天翘嘴活跃',
-        subtitle: '同类水域早晚窗口命中率更高',
+        title: '最近翘嘴出鱼多',
+        subtitle: '早晚窗口更值得优先尝试路亚',
         trailing: '+11',
         color: InkPalette.moss,
       ),

@@ -8,12 +8,43 @@ import '../../../shared/widgets/ink_app_widgets.dart';
 import '../data/venue_mock_data.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key, this.initialContent = 0});
+  const ExploreScreen({
+    super.key,
+    this.initialContent = 0,
+    this.initialSpot,
+    this.initialFish,
+    this.initialWindow,
+    this.initialHint,
+    this.initialIntent,
+    this.entry,
+  });
 
   final int initialContent;
+  final String? initialSpot;
+  final String? initialFish;
+  final String? initialWindow;
+  final String? initialHint;
+  final String? initialIntent;
+  final String? entry;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
+}
+
+String _routeContextKeyFor(ExploreScreen widget) {
+  final values =
+      [
+            widget.entry,
+            widget.initialIntent,
+            widget.initialSpot,
+            widget.initialFish,
+            widget.initialWindow,
+            widget.initialHint,
+          ]
+          .where((value) => value != null && value.trim().isNotEmpty)
+          .map((value) => value!.trim())
+          .join('|');
+  return values;
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
@@ -23,6 +54,41 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _loading = false;
   bool _networkError = false;
   bool _locationGranted = true;
+  String? _appliedRouteContextKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyRouteContext();
+  }
+
+  @override
+  void didUpdateWidget(covariant ExploreScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_routeContextKeyFor(widget) != _routeContextKeyFor(oldWidget)) {
+      setState(_applyRouteContext);
+    }
+  }
+
+  bool get _hasRouteContext => _routeContextKeyFor(widget).isNotEmpty;
+
+  void _applyRouteContext() {
+    final key = _routeContextKeyFor(widget);
+    if (key.isEmpty || key == _appliedRouteContextKey) return;
+    _appliedRouteContextKey = key;
+
+    final fish = widget.initialFish?.trim();
+    if (fish != null && fish.isNotEmpty) {
+      _filters.add('fish_$fish');
+      _sortId = 'today_good';
+    }
+    if (widget.initialIntent == 'booking' || widget.initialIntent == 'route') {
+      _sortId = 'today_good';
+    }
+    _searchQuery = '';
+    _networkError = false;
+    _locationGranted = true;
+  }
 
   List<FishingVenue> get _visibleVenues {
     final query = _searchQuery.trim().toLowerCase();
@@ -174,15 +240,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewPadding.bottom + 112.h,
+            bottom: MediaQuery.of(context).viewPadding.bottom + 92.h,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               InkTopBar(
-                title: '钓场探索',
+                title: '选钓点',
                 subtitle:
-                    '${venueSummary.location} · ${venueSummary.updatedAt}更新',
+                    '${venueSummary.location} · ${venueSummary.updatedAt}',
                 leading: Container(
                   width: 42.w,
                   height: 42.w,
@@ -211,7 +277,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ],
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
+                padding: EdgeInsets.fromLTRB(18.w, 5.h, 18.w, 0),
                 child: _LocationSearchCard(
                   query: _searchQuery,
                   locationGranted: _locationGranted,
@@ -222,6 +288,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   },
                 ),
               ),
+              if (_hasRouteContext)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(18.w, 7.h, 18.w, 0),
+                  child: _ExploreRouteContextCard(
+                    venue: featured,
+                    fish: widget.initialFish,
+                    window: widget.initialWindow,
+                    hint: widget.initialHint,
+                    intent: widget.initialIntent,
+                    onTap: widget.initialIntent == 'booking'
+                        ? () => _openBooking(featured)
+                        : () => _openDetail(featured),
+                  ),
+                ),
               if (!_locationGranted)
                 Padding(
                   padding: EdgeInsets.fromLTRB(18.w, 10.h, 18.w, 0),
@@ -252,7 +332,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   child: const _LoadingVenueCard(),
                 ),
               Padding(
-                padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 0),
+                padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
                 child: _FishingIndexCard(
                   summary: venueSummary,
                   venue: featured,
@@ -266,11 +346,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 onTap: _applyFilter,
                 onMore: _openFilters,
               ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
+                child: _ExploreServiceDock(
+                  venue: featured,
+                  onOpenServices: () =>
+                      _showExploreMoreSheet(context, featured),
+                  onBook: () => _openBooking(featured),
+                  onMall: () => context.go(AppRouteNames.mall),
+                ),
+              ),
               InkSectionHeader(
-                title: _searchQuery.isEmpty ? '附近钓场' : '搜索结果',
+                title: _searchQuery.isEmpty ? '更多钓点' : '搜索结果',
                 subtitle: _searchQuery.isEmpty
-                    ? '可预约、鱼情和设备数据优先'
-                    : '匹配 $_searchQuery 的钓场、鱼种和服务',
+                    ? '按距离和适合度排序'
+                    : '匹配 $_searchQuery',
                 action: '刷新',
                 onAction: _refresh,
               ),
@@ -288,7 +378,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 )
               else
                 SizedBox(
-                  height: 286.h,
+                  height: 254.h,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -305,34 +395,237 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     },
                   ),
                 ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 0),
-                child: _VenueMapPreview(venue: featured),
-              ),
-              _EventSection(
-                venues: fishingVenues.where((item) => item.events.isNotEmpty),
-                onTap: (venue) => _openBooking(venue),
-              ),
-              _DeviceInsightSection(
-                venue: featured,
-                onSync: () => AppFeedback.showMessage(
-                  context,
-                  '${featured.name} 设备数据已同步',
-                ),
-              ),
-              _MallRecommendationSection(
-                venue: featured,
-                onProductTap: (productId) => context.push(
-                  '${AppRouteNames.mallProductDetail}?id=$productId',
-                ),
-                onMallTap: () => context.go(AppRouteNames.mall),
-              ),
+              SizedBox(height: 16.h),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+void _showExploreMoreSheet(BuildContext context, FishingVenue featured) {
+  showInkActionSheet(
+    context,
+    title: '钓点服务',
+    subtitle: '地图、活动、设备和补给放在这里',
+    icon: Icons.layers_rounded,
+    color: InkPalette.lake,
+    showLandscape: true,
+    children: [
+      _VenueMapPreview(venue: featured),
+      _EventSection(
+        venues: fishingVenues.where((item) => item.events.isNotEmpty),
+        onTap: (venue) => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          barrierColor: InkPalette.ink.withValues(alpha: 0.24),
+          builder: (_) => _BookingSheet(venue: venue),
+        ),
+      ),
+      _DeviceInsightSection(
+        venue: featured,
+        onSync: () =>
+            AppFeedback.showMessage(context, '${featured.name} 设备数据已同步'),
+      ),
+      _MallRecommendationSection(
+        venue: featured,
+        onProductTap: (productId) =>
+            context.push('${AppRouteNames.mallProductDetail}?id=$productId'),
+        onMallTap: () => context.go(AppRouteNames.mall),
+      ),
+    ],
+  );
+}
+
+class _ExploreServiceDock extends StatelessWidget {
+  const _ExploreServiceDock({
+    required this.venue,
+    required this.onOpenServices,
+    required this.onBook,
+    required this.onMall,
+  });
+
+  final FishingVenue venue;
+  final VoidCallback onOpenServices;
+  final VoidCallback onBook;
+  final VoidCallback onMall;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _ExploreServiceItem(
+        icon: Icons.map_rounded,
+        title: '地图',
+        subtitle: venue.navigationHint,
+        color: InkPalette.lake,
+        onTap: onOpenServices,
+      ),
+      _ExploreServiceItem(
+        icon: Icons.event_available_rounded,
+        title: '预约',
+        subtitle: venue.bookingSupported ? '可订钓位' : '查看规则',
+        color: InkPalette.pine,
+        onTap: onBook,
+      ),
+      _ExploreServiceItem(
+        icon: Icons.sensors_rounded,
+        title: '鱼情',
+        subtitle: '设备联动',
+        color: InkPalette.moss,
+        onTap: onOpenServices,
+      ),
+      _ExploreServiceItem(
+        icon: Icons.shopping_bag_rounded,
+        title: '补给',
+        subtitle: '按钓点配',
+        color: InkPalette.reed,
+        onTap: onMall,
+      ),
+    ];
+
+    return InkGlassCard(
+      padding: EdgeInsets.all(10.r),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const InkCommercialVisual(
+                kind: InkVisualTileKind.map,
+                width: 48,
+                height: 48,
+                radius: 14,
+                borderColor: Colors.transparent,
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '钓点服务',
+                      style: TextStyle(
+                        color: InkPalette.text,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      '地图、预约、设备鱼情和补给',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.muted,
+                        fontSize: 10.8.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              InkPressable(
+                onTap: onOpenServices,
+                child: Text(
+                  '全部服务',
+                  style: TextStyle(
+                    color: InkPalette.lake,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 9.h),
+          Row(
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                Expanded(
+                  child: InkEntrance(
+                    delay: Duration(milliseconds: 35 * i),
+                    offset: 6,
+                    child: _ExploreServiceTile(item: items[i]),
+                  ),
+                ),
+                if (i != items.length - 1) SizedBox(width: 8.w),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExploreServiceTile extends StatelessWidget {
+  const _ExploreServiceTile({required this.item});
+
+  final _ExploreServiceItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkPressable(
+      onTap: item.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        constraints: BoxConstraints(minHeight: 76.h),
+        padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: item.color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(15.r),
+          border: Border.all(color: item.color.withValues(alpha: 0.12)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(item.icon, color: item.color, size: 18.w),
+            const Spacer(),
+            Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.text,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(height: 2.h),
+            Text(
+              item.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.muted,
+                fontSize: 9.8.sp,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExploreServiceItem {
+  const _ExploreServiceItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
 }
 
 class _LocationSearchCard extends StatelessWidget {
@@ -351,7 +644,7 @@ class _LocationSearchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkCard(
-      padding: EdgeInsets.all(12.r),
+      padding: EdgeInsets.all(10.r),
       child: Column(
         children: [
           InkInfoRow(
@@ -365,7 +658,7 @@ class _LocationSearchCard extends StatelessWidget {
             trailing: locationGranted ? '切换' : '开启',
             color: locationGranted ? InkPalette.pine : InkPalette.reed,
           ),
-          SizedBox(height: 10.h),
+          SizedBox(height: 8.h),
           Row(
             children: [
               Expanded(
@@ -374,15 +667,15 @@ class _LocationSearchCard extends StatelessWidget {
                   onTap: onSearch,
                 ),
               ),
-              SizedBox(width: 10.w),
+              SizedBox(width: 8.w),
               InkPressable(
                 onTap: onLocationTap,
                 child: Container(
-                  width: 46.w,
-                  height: 46.h,
+                  width: 42.w,
+                  height: 42.h,
                   decoration: BoxDecoration(
                     color: InkPalette.lake.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(16.r),
+                    borderRadius: BorderRadius.circular(14.r),
                     border: Border.all(
                       color: InkPalette.lake.withValues(alpha: 0.18),
                     ),
@@ -390,7 +683,7 @@ class _LocationSearchCard extends StatelessWidget {
                   child: Icon(
                     Icons.radar_rounded,
                     color: InkPalette.lake,
-                    size: 22.w,
+                    size: 20.w,
                   ),
                 ),
               ),
@@ -398,6 +691,51 @@ class _LocationSearchCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ExploreRouteContextCard extends StatelessWidget {
+  const _ExploreRouteContextCard({
+    required this.venue,
+    required this.fish,
+    required this.window,
+    required this.hint,
+    required this.intent,
+    required this.onTap,
+  });
+
+  final FishingVenue venue;
+  final String? fish;
+  final String? window;
+  final String? hint;
+  final String? intent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final actionLabel = intent == 'booking'
+        ? '预约'
+        : intent == 'route'
+        ? '查看'
+        : '承接';
+    final fishText = fish?.trim().isNotEmpty == true
+        ? fish!.trim()
+        : venue.fishSpecies.first;
+    final windowText = window?.trim().isNotEmpty == true
+        ? window!.trim()
+        : venue.openHours;
+    final hintText = hint?.trim().isNotEmpty == true
+        ? hint!.trim()
+        : venue.navigationHint;
+
+    return InkRouteContextBanner(
+      icon: Icons.route_rounded,
+      title: '首页推荐已带入 · $fishText',
+      subtitle: '$windowText · $hintText · ${venue.name}',
+      trailing: actionLabel,
+      color: InkPalette.lake,
+      onTap: onTap,
     );
   }
 }
@@ -416,24 +754,24 @@ class _FishingIndexCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkCard(
-      padding: EdgeInsets.all(15.r),
+      padding: EdgeInsets.all(11.r),
       borderColor: InkPalette.pine.withValues(alpha: 0.22),
       child: Row(
         children: [
           SizedBox(
-            width: 112.w,
-            height: 132.h,
+            width: 88.w,
+            height: 104.h,
             child: Stack(
               fit: StackFit.expand,
               children: [
                 const InkCommercialVisual(
                   kind: InkVisualTileKind.map,
-                  radius: 20,
+                  radius: 18,
                   borderColor: Colors.transparent,
                 ),
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20.r),
+                    borderRadius: BorderRadius.circular(18.r),
                     color: InkPalette.ink.withValues(alpha: 0.10),
                   ),
                 ),
@@ -445,12 +783,12 @@ class _FishingIndexCard extends StatelessWidget {
                         '${summary.todayIndex}',
                         style: TextStyle(
                           color: InkPalette.white,
-                          fontSize: 32.sp,
+                          fontSize: 28.sp,
                           height: 1,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      SizedBox(height: 4.h),
+                      SizedBox(height: 3.h),
                       Text(
                         '适钓指数',
                         style: TextStyle(
@@ -465,7 +803,7 @@ class _FishingIndexCard extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(width: 13.w),
+          SizedBox(width: 10.w),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,30 +813,30 @@ class _FishingIndexCard extends StatelessWidget {
                   color: InkPalette.pine,
                   icon: Icons.auto_graph_rounded,
                 ),
-                SizedBox(height: 9.h),
+                SizedBox(height: 6.h),
                 Text(
-                  '今日适合找钓场',
+                  '推荐：${venue.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: InkPalette.text,
-                    fontSize: 19.sp,
+                    fontSize: 17.5.sp,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 6.h),
+                SizedBox(height: 4.h),
                 Text(
                   summary.indexReason,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: InkPalette.muted,
-                    fontSize: 12.sp,
-                    height: 1.35,
+                    fontSize: 11.5.sp,
+                    height: 1.25,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                SizedBox(height: 10.h),
+                SizedBox(height: 7.h),
                 Row(
                   children: [
                     Expanded(
@@ -512,8 +850,8 @@ class _FishingIndexCard extends StatelessWidget {
                     InkPressable(
                       onTap: onRefresh,
                       child: Container(
-                        height: 38.h,
-                        padding: EdgeInsets.symmetric(horizontal: 10.w),
+                        height: 34.h,
+                        padding: EdgeInsets.symmetric(horizontal: 9.w),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: InkPalette.pine,
@@ -523,7 +861,7 @@ class _FishingIndexCard extends StatelessWidget {
                           '刷新',
                           style: TextStyle(
                             color: InkPalette.white,
-                            fontSize: 12.sp,
+                            fontSize: 11.5.sp,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -531,9 +869,9 @@ class _FishingIndexCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                SizedBox(height: 8.h),
+                SizedBox(height: 6.h),
                 Text(
-                  '优先推荐：${venue.name}',
+                  venue.navigationHint,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -572,20 +910,17 @@ class _QuickFilterBar extends StatelessWidget {
         .where(
           (item) =>
               item.id == 'nearest' ||
-              item.id == 'popular' ||
               item.id == 'bookable' ||
               item.id == 'today_good' ||
-              item.id == 'night' ||
-              item.id == 'device_friendly' ||
-              item.id == 'event',
+              item.id == 'device_friendly',
         )
         .toList();
     return SizedBox(
-      height: 46.h,
+      height: 42.h,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 0),
+        padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
         itemCount: quick.length + 1,
         separatorBuilder: (_, _) => SizedBox(width: 8.w),
         itemBuilder: (context, index) {
@@ -630,9 +965,9 @@ class _VenueCard extends StatelessWidget {
     final color = _colorForVenue(venue);
     final bookable = venue.bookingSupported && venue.status == VenueStatus.open;
     return SizedBox(
-      width: 292.w,
+      width: 272.w,
       child: InkCard(
-        padding: EdgeInsets.all(12.r),
+        padding: EdgeInsets.all(10.r),
         onTap: onDetail,
         borderColor: color.withValues(alpha: 0.22),
         child: Column(
@@ -641,8 +976,8 @@ class _VenueCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _VenueImage(venue: venue, width: 94, height: 86),
-                SizedBox(width: 11.w),
+                _VenueImage(venue: venue, width: 82, height: 72),
+                SizedBox(width: 9.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,11 +987,11 @@ class _VenueCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               venue.name,
-                              maxLines: 2,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: InkPalette.text,
-                                fontSize: 16.sp,
+                                fontSize: 14.5.sp,
                                 height: 1.12,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -670,18 +1005,18 @@ class _VenueCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      SizedBox(height: 6.h),
+                      SizedBox(height: 4.h),
                       Text(
                         '${venue.distanceLabel} · ${venue.area} · ${venue.openHours}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: InkPalette.muted,
-                          fontSize: 11.5.sp,
+                          fontSize: 10.8.sp,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      SizedBox(height: 7.h),
+                      SizedBox(height: 5.h),
                       Row(
                         children: [
                           Icon(
@@ -694,7 +1029,7 @@ class _VenueCard extends StatelessWidget {
                             venue.rating.toStringAsFixed(1),
                             style: TextStyle(
                               color: InkPalette.text,
-                              fontSize: 11.5.sp,
+                              fontSize: 10.8.sp,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -718,10 +1053,10 @@ class _VenueCard extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: 10.h),
+            SizedBox(height: 7.h),
             Wrap(
               spacing: 6.w,
-              runSpacing: 6.h,
+              runSpacing: 5.h,
               children: [
                 for (final fish in venue.fishSpecies.take(3))
                   _TinyPill(label: fish, color: InkPalette.lake),
@@ -737,7 +1072,7 @@ class _VenueCard extends StatelessWidget {
                   const _TinyPill(label: '设备友好', color: InkPalette.moss),
               ],
             ),
-            SizedBox(height: 10.h),
+            SizedBox(height: 7.h),
             Row(
               children: [
                 Expanded(
@@ -747,7 +1082,7 @@ class _VenueCard extends StatelessWidget {
                     color: color,
                   ),
                 ),
-                SizedBox(width: 8.w),
+                SizedBox(width: 7.w),
                 Expanded(
                   child: _MiniMetric(
                     value: _statusText(venue),
@@ -768,7 +1103,7 @@ class _VenueCard extends StatelessWidget {
                     onTap: onDetail,
                   ),
                 ),
-                SizedBox(width: 9.w),
+                SizedBox(width: 8.w),
                 Expanded(
                   child: _SolidButton(
                     label: bookable ? '立即预约' : _statusText(venue),

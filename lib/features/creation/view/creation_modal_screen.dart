@@ -12,9 +12,22 @@ import '../../../features/creation/data/catch_journal_repository.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
 
 class CreationModalScreen extends ConsumerStatefulWidget {
-  const CreationModalScreen({super.key, this.initialSpot});
+  const CreationModalScreen({
+    super.key,
+    this.initialSpot,
+    this.initialFish,
+    this.initialMethod,
+    this.initialWindow,
+    this.initialHint,
+    this.entry,
+  });
 
   final String? initialSpot;
+  final String? initialFish;
+  final String? initialMethod;
+  final String? initialWindow;
+  final String? initialHint;
+  final String? entry;
 
   @override
   ConsumerState<CreationModalScreen> createState() =>
@@ -96,9 +109,31 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
     if (initialSpot != null && initialSpot.isNotEmpty) {
       _spot = initialSpot;
     }
+    final initialFish = widget.initialFish?.trim();
+    if (initialFish != null && initialFish.isNotEmpty) {
+      _fish = initialFish;
+    }
+    final initialMethod = widget.initialMethod?.trim();
+    if (initialMethod != null && initialMethod.isNotEmpty) {
+      _method = initialMethod;
+    }
+    if (_hasRouteContext) {
+      _noteController.text =
+          '${widget.initialWindow ?? '推荐窗口'}，${widget.initialHint ?? '推荐站位'}，按首页 AI 决策执行。';
+    }
   }
 
   bool get _busy => _savingDraft || _publishing;
+
+  bool get _hasRouteContext {
+    return [
+      widget.initialSpot,
+      widget.initialFish,
+      widget.initialMethod,
+      widget.initialWindow,
+      widget.initialHint,
+    ].any((value) => value != null && value.trim().isNotEmpty);
+  }
 
   int get _probability {
     if (_fish == '翘嘴') return 87;
@@ -242,10 +277,10 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
                   height: height,
                   child: InkGlassCard(
                     padding: EdgeInsets.fromLTRB(
-                      16.w,
-                      10.h,
-                      16.w,
-                      14.h + safeBottom,
+                      14.w,
+                      8.h,
+                      14.w,
+                      12.h + safeBottom,
                     ),
                     child: Column(
                       children: [
@@ -257,14 +292,24 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
-                        SizedBox(height: 14.h),
+                        SizedBox(height: 10.h),
                         _CreationHeader(onClose: () => context.pop()),
-                        SizedBox(height: 14.h),
+                        SizedBox(height: 9.h),
                         _CreationFlow(
                           activeStep: _step,
                           onStep: (step) => setState(() => _step = step),
                         ),
-                        SizedBox(height: 12.h),
+                        if (_hasRouteContext) ...[
+                          SizedBox(height: 7.h),
+                          _CreationRouteContextCard(
+                            spot: _spot,
+                            fish: _fish,
+                            method: _method,
+                            window: widget.initialWindow,
+                            hint: widget.initialHint,
+                          ),
+                        ],
+                        SizedBox(height: 8.h),
                         Expanded(
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 240),
@@ -277,7 +322,7 @@ class _CreationModalScreenState extends ConsumerState<CreationModalScreen> {
                             ),
                           ),
                         ),
-                        SizedBox(height: 12.h),
+                        SizedBox(height: 8.h),
                         _CreationFooter(
                           step: _step,
                           savingDraft: _savingDraft,
@@ -355,31 +400,32 @@ class _CreationHeader extends StatelessWidget {
         InkIconMark(
           icon: Icons.add_circle_outline_rounded,
           color: InkPalette.pine,
-          size: 46,
-          iconSize: 24,
+          size: 38,
+          iconSize: 20,
         ),
-        SizedBox(width: 12.w),
+        SizedBox(width: 10.w),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '记录这次出钓',
+                '现场开钓',
                 style: TextStyle(
                   color: InkPalette.text,
-                  fontSize: 21.sp,
+                  fontSize: 18.5.sp,
+                  height: 1.05,
                   fontWeight: FontWeight.w900,
                   fontFamilyFallback: brushFontFallback,
                 ),
               ),
-              SizedBox(height: 3.h),
+              SizedBox(height: 2.h),
               Text(
-                '少填表，多沉淀：鱼获、鱼情、复盘一并归档',
+                '先看计划，有收获再快速记录',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: InkPalette.muted,
-                  fontSize: 12.sp,
+                  fontSize: 11.sp,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -401,13 +447,13 @@ class _CreationFlow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final steps = [
-      (Icons.place_rounded, '选水域'),
-      (Icons.set_meal_rounded, '填鱼情'),
-      (Icons.auto_awesome_rounded, '预览发布'),
+      (Icons.play_arrow_rounded, '计划'),
+      (Icons.set_meal_rounded, '鱼获'),
+      (Icons.auto_awesome_rounded, '复盘'),
     ];
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 9.h),
+      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 7.h),
       decoration: BoxDecoration(
         color: InkPalette.paper.withValues(alpha: 0.76),
         borderRadius: BorderRadius.circular(18.r),
@@ -422,8 +468,8 @@ class _CreationFlow extends StatelessWidget {
                 child: Column(
                   children: [
                     Container(
-                      width: 28.w,
-                      height: 28.w,
+                      width: 24.w,
+                      height: 24.w,
                       decoration: BoxDecoration(
                         color: i == activeStep
                             ? InkPalette.pine
@@ -440,17 +486,17 @@ class _CreationFlow extends StatelessWidget {
                         color: i == activeStep
                             ? InkPalette.white
                             : InkPalette.pine,
-                        size: 16.w,
+                        size: 14.w,
                       ),
                     ),
-                    SizedBox(height: 4.h),
+                    SizedBox(height: 3.h),
                     Text(
                       steps[i].$2,
                       style: TextStyle(
                         color: i == activeStep
                             ? InkPalette.pine
                             : InkPalette.text,
-                        fontSize: 11.5.sp,
+                        fontSize: 10.8.sp,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -467,6 +513,38 @@ class _CreationFlow extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _CreationRouteContextCard extends StatelessWidget {
+  const _CreationRouteContextCard({
+    required this.spot,
+    required this.fish,
+    required this.method,
+    required this.window,
+    required this.hint,
+  });
+
+  final String spot;
+  final String fish;
+  final String method;
+  final String? window;
+  final String? hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final windowText = window?.trim().isNotEmpty == true
+        ? window!.trim()
+        : '推荐窗口';
+    final hintText = hint?.trim().isNotEmpty == true ? hint!.trim() : '推荐站位';
+
+    return InkRouteContextBanner(
+      icon: Icons.auto_awesome_rounded,
+      title: '首页推荐已带入 · $fish',
+      subtitle: '$spot · $method · $windowText · $hintText',
+      trailing: '已预填',
+      color: InkPalette.moss,
     );
   }
 }
@@ -499,31 +577,31 @@ class _CatchBasicsStep extends StatelessWidget {
       children: [
         _GuideCard(
           icon: Icons.touch_app_rounded,
-          title: '先填 3 个关键事实',
-          subtitle: '水域、鱼种、尺寸重量会决定鱼获档案和社区卡片的主信息。',
+          title: '先记最重要的',
+          subtitle: '拍照、鱼种和大小够用了。',
           color: InkPalette.pine,
         ),
-        SizedBox(height: 10.h),
+        SizedBox(height: 8.h),
         _PhotoStubCard(photoPaths: photoPaths, fish: fish, onTap: onPhotoTap),
-        SizedBox(height: 10.h),
+        SizedBox(height: 8.h),
         _OptionCard(
           title: '水域',
-          subtitle: '默认带入最近推荐钓点，允许手动切换。',
+          subtitle: '默认带入推荐钓点。',
           options: const ['千岛湖 · 东南湖区', '支流回水湾', '老码头', '湘湖草边'],
           selected: spot,
           color: InkPalette.lake,
           onSelected: onSpot,
         ),
-        SizedBox(height: 10.h),
+        SizedBox(height: 8.h),
         _OptionCard(
           title: '鱼种',
-          subtitle: '鱼种会进入下一次鱼情模型，是最重要的标签。',
+          subtitle: '用于生成鱼获卡片。',
           options: const ['翘嘴', '鲫鱼', '鲤鱼', '鲶鱼', '鲈鱼', '黄颡'],
           selected: fish,
           color: InkPalette.moss,
           onSelected: onFish,
         ),
-        SizedBox(height: 10.h),
+        SizedBox(height: 8.h),
         Row(
           children: [
             Expanded(
@@ -580,14 +658,14 @@ class _CatchConditionStep extends StatelessWidget {
       children: [
         _GuideCard(
           icon: Icons.analytics_rounded,
-          title: '这些信息会反哺推荐',
-          subtitle: '钓法、水色、鱼口和设备数据会用于下一次推荐置信度。',
+          title: '补充现场情况',
+          subtitle: '能自动带入就不用手填。',
           color: InkPalette.lake,
         ),
         SizedBox(height: 10.h),
         _OptionCard(
           title: '钓法',
-          subtitle: '用于匹配装备、鱼层和窗口期。',
+          subtitle: '影响复盘建议。',
           options: const ['路亚亮片', '米诺慢控', '腥饵台钓', '蚯蚓守底', '飞铅白条'],
           selected: method,
           color: InkPalette.pine,
@@ -596,7 +674,7 @@ class _CatchConditionStep extends StatelessWidget {
         SizedBox(height: 10.h),
         _OptionCard(
           title: '水色',
-          subtitle: '决定饵色、味型和搜索速度。',
+          subtitle: '选一个就好。',
           options: const ['清水', '微浑', '泥水'],
           selected: waterClarity,
           color: InkPalette.lake,
@@ -605,7 +683,7 @@ class _CatchConditionStep extends StatelessWidget {
         SizedBox(height: 10.h),
         _OptionCard(
           title: '鱼口',
-          subtitle: '让复盘能判断是窗口、站位还是钓法问题。',
+          subtitle: '记录今天的口感。',
           options: const ['连续追口', '轻口', '只蹭线', '无口', '跑鱼'],
           selected: bite,
           color: InkPalette.reed,
@@ -614,7 +692,7 @@ class _CatchConditionStep extends StatelessWidget {
         SizedBox(height: 10.h),
         _OptionCard(
           title: '设备',
-          subtitle: '同步水温、水深、电量，也可以手动记录。',
+          subtitle: '有设备就同步。',
           options: const ['已同步', '手动填写', '未连接'],
           selected: device,
           color: InkPalette.moss,
@@ -669,7 +747,7 @@ class _CatchPreviewStep extends StatelessWidget {
         SizedBox(height: 10.h),
         _OptionCard(
           title: '发布范围',
-          subtitle: '草稿始终仅自己可见；发布时按这里的范围展示。',
+          subtitle: '发布前可以再改。',
           options: const ['公开', '钓友可见', '仅自己'],
           selected: visibility,
           color: InkPalette.pine,
@@ -709,13 +787,13 @@ class _GuideCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkCard(
-      padding: EdgeInsets.all(11.r),
+      padding: EdgeInsets.all(9.r),
       color: InkPalette.white.withValues(alpha: 0.84),
       borderColor: color.withValues(alpha: 0.14),
       child: Row(
         children: [
-          InkIconMark(icon: icon, color: color, size: 38, iconSize: 18),
-          SizedBox(width: 10.w),
+          InkIconMark(icon: icon, color: color, size: 32, iconSize: 16),
+          SizedBox(width: 8.w),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -724,17 +802,19 @@ class _GuideCard extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color: InkPalette.text,
-                    fontSize: 14.sp,
+                    fontSize: 13.sp,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 3.h),
+                SizedBox(height: 2.h),
                 Text(
                   subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: InkPalette.muted,
-                    fontSize: 11.5.sp,
-                    height: 1.36,
+                    fontSize: 10.8.sp,
+                    height: 1.22,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -766,7 +846,7 @@ class _PhotoStubCard extends StatelessWidget {
         onTap: onTap,
         child: Container(
           width: double.infinity,
-          height: 140.h,
+          height: 112.h,
           decoration: BoxDecoration(
             color: InkPalette.ink.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(16.r),
@@ -777,14 +857,14 @@ class _PhotoStubCard extends StatelessWidget {
               Icon(
                 Icons.add_a_photo_rounded,
                 color: InkPalette.muted,
-                size: 28.w,
+                size: 24.w,
               ),
-              SizedBox(height: 8.h),
+              SizedBox(height: 6.h),
               Text(
                 '添加鱼获照片',
                 style: TextStyle(
                   color: InkPalette.muted,
-                  fontSize: 13.sp,
+                  fontSize: 12.sp,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -801,16 +881,16 @@ class _PhotoStubCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            height: 140.h,
+            height: 116.h,
             child: ListView.separated(
-              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
               scrollDirection: Axis.horizontal,
               itemCount: photoPaths.length + 1,
               separatorBuilder: (_, _) => SizedBox(width: 8.w),
               itemBuilder: (context, index) {
                 if (index == photoPaths.length) {
                   return Container(
-                    width: 100.w,
+                    width: 84.w,
                     decoration: BoxDecoration(
                       color: InkPalette.rice.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(12.r),
@@ -820,13 +900,13 @@ class _PhotoStubCard extends StatelessWidget {
                       child: Icon(
                         Icons.add_rounded,
                         color: InkPalette.muted,
-                        size: 32.w,
+                        size: 28.w,
                       ),
                     ),
                   );
                 }
                 return Container(
-                  width: 140.w,
+                  width: 112.w,
                   decoration: BoxDecoration(
                     color: InkPalette.ink.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(12.r),
@@ -913,7 +993,7 @@ class _OptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkCard(
-      padding: EdgeInsets.all(11.r),
+      padding: EdgeInsets.all(9.r),
       color: InkPalette.paper.withValues(alpha: 0.72),
       borderColor: color.withValues(alpha: 0.13),
       child: Column(
@@ -923,23 +1003,25 @@ class _OptionCard extends StatelessWidget {
             title,
             style: TextStyle(
               color: InkPalette.text,
-              fontSize: 14.sp,
+              fontSize: 13.sp,
               fontWeight: FontWeight.w900,
             ),
           ),
-          SizedBox(height: 3.h),
+          SizedBox(height: 2.h),
           Text(
             subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.muted,
-              fontSize: 11.sp,
+              fontSize: 10.5.sp,
               fontWeight: FontWeight.w800,
             ),
           ),
-          SizedBox(height: 10.h),
+          SizedBox(height: 7.h),
           Wrap(
-            spacing: 7.w,
-            runSpacing: 7.h,
+            spacing: 6.w,
+            runSpacing: 5.h,
             children: [
               for (final option in options)
                 InkChip(
@@ -972,7 +1054,7 @@ class _MiniInputCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkCard(
-      padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 10.h),
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
       color: InkPalette.paper.withValues(alpha: 0.72),
       borderColor: color.withValues(alpha: 0.13),
       child: Column(
@@ -992,13 +1074,13 @@ class _MiniInputCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 7.h),
+          SizedBox(height: 5.h),
           TextField(
             controller: controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: TextStyle(
               color: InkPalette.text,
-              fontSize: 15.sp,
+              fontSize: 14.sp,
               fontWeight: FontWeight.w900,
             ),
             decoration: const InputDecoration(
@@ -1021,7 +1103,7 @@ class _NoteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkCard(
-      padding: EdgeInsets.all(11.r),
+      padding: EdgeInsets.all(9.r),
       color: InkPalette.paper.withValues(alpha: 0.72),
       borderColor: InkPalette.line.withValues(alpha: 0.82),
       child: Column(
@@ -1031,15 +1113,15 @@ class _NoteCard extends StatelessWidget {
             '复盘备注',
             style: TextStyle(
               color: InkPalette.text,
-              fontSize: 14.sp,
+              fontSize: 13.sp,
               fontWeight: FontWeight.w900,
             ),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 6.h),
           TextField(
             controller: controller,
-            minLines: 3,
-            maxLines: 4,
+            minLines: 2,
+            maxLines: 3,
             style: TextStyle(
               color: InkPalette.text,
               fontSize: 12.5.sp,
@@ -1305,7 +1387,7 @@ class _CreationFooter extends StatelessWidget {
           child: InkPressable(
             onTap: onDraft,
             child: Container(
-              height: 50.h,
+              height: 44.h,
               decoration: BoxDecoration(
                 color: InkPalette.white.withValues(alpha: 0.78),
                 borderRadius: BorderRadius.circular(999),
@@ -1322,14 +1404,14 @@ class _CreationFooter extends StatelessWidget {
                           Icon(
                             Icons.bookmark_add_rounded,
                             color: InkPalette.pine,
-                            size: 18.w,
+                            size: 16.w,
                           ),
-                          SizedBox(width: 6.w),
+                          SizedBox(width: 5.w),
                           Text(
                             '存草稿',
                             style: TextStyle(
                               color: InkPalette.pine,
-                              fontSize: 15.sp,
+                              fontSize: 13.5.sp,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -1342,10 +1424,10 @@ class _CreationFooter extends StatelessWidget {
         SizedBox(width: 10.w),
         Expanded(
           child: InkPrimaryButton(
-            label: step < 2 ? '下一步' : '发布动态',
+            label: step < 2 ? '下一步' : '保存复盘',
             icon: step < 2
                 ? Icons.arrow_forward_rounded
-                : Icons.cloud_upload_rounded,
+                : Icons.summarize_rounded,
             color: step < 2 ? InkPalette.pine : InkPalette.lake,
             busy: publishing,
             onTap: step < 2 ? onNext : onPublish,

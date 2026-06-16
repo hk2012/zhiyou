@@ -25,6 +25,7 @@ class MallHome extends StatelessWidget {
     required this.checkoutSummary,
     required this.serviceSummary,
     required this.onSearchTap,
+    required this.onQuickSearch,
     required this.onCartTap,
     required this.onCategoryTap,
     required this.onBannerTap,
@@ -54,6 +55,7 @@ class MallHome extends StatelessWidget {
   final Widget checkoutSummary;
   final Widget serviceSummary;
   final VoidCallback onSearchTap;
+  final ValueChanged<String> onQuickSearch;
   final VoidCallback onCartTap;
   final ValueChanged<MallCategoryEntry> onCategoryTap;
   final VoidCallback onBannerTap;
@@ -85,11 +87,41 @@ class MallHome extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
+          padding: EdgeInsets.fromLTRB(18.w, 5.h, 18.w, 0),
           child: MallSearchBar(searchText: searchText, onTap: onSearchTap),
         ),
+        if (!hasSearch)
+          _MallShoppingModeStrip(
+            onSceneTap: () => onQuickSearch('夜钓'),
+            onProblemTap: () => onQuickSearch('鱼口轻'),
+            onDeviceTap: () => onQuickSearch('智能鱼漂'),
+            onMemberTap: onMemberTap,
+          ),
+        if (!hasSearch)
+          _MallSolutionGuideSection(
+            title: '常见需求',
+            subtitle: '按问题直接找补给',
+            entries: [
+              ..._sceneSolutionEntries.take(2),
+              ..._problemSolutionEntries.take(2),
+            ],
+            onTap: onQuickSearch,
+          ),
+        if (showFocusedProducts && hasSearch)
+          ProductSection(
+            title: '搜索结果',
+            subtitle: '匹配 $searchText',
+            products: searchResults,
+            compact: true,
+            emptyText: '当前没有匹配商品，试试智能鱼漂、夜钓或钓场套餐',
+            favoriteIds: favoriteIds,
+            cartQuantities: cartQuantities,
+            onProductTap: onProductTap,
+            onProductAdd: onProductAdd,
+            onProductFavorite: onProductFavorite,
+          ),
         Padding(
-          padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 0),
+          padding: EdgeInsets.fromLTRB(18.w, hasSearch ? 8.h : 12.h, 18.w, 0),
           child: MallBanner(
             cartCount: cartCount,
             onTap: onBannerTap,
@@ -101,12 +133,10 @@ class MallHome extends StatelessWidget {
           activeCategoryId: activeCategoryId,
           onTap: onCategoryTap,
         ),
-        if (showFocusedProducts)
+        if (showFocusedProducts && !hasSearch)
           ProductSection(
-            title: hasSearch ? '搜索结果' : '${activeCategory?.label ?? '分类'}专区',
-            subtitle: hasSearch
-                ? '匹配 $searchText 的设备、场景和商品'
-                : activeCategory?.subtitle ?? '按分类查看商城商品',
+            title: '${activeCategory?.label ?? '分类'}专区',
+            subtitle: activeCategory?.subtitle ?? '按分类查看商城商品',
             products: searchResults,
             emptyText: '当前没有匹配商品，试试智能鱼漂、夜钓或钓场套餐',
             favoriteIds: favoriteIds,
@@ -129,57 +159,9 @@ class MallHome extends StatelessWidget {
           onPackageTap: onScenarioTap,
           onPackageBuy: onScenarioBuy,
         ),
-        MemberDealSection(
-          products: memberProducts,
-          onTap: onMemberTap,
-          onProductTap: onProductTap,
-          onProductAdd: onProductAdd,
-        ),
         Padding(
           padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 0),
           child: checkoutSummary,
-        ),
-        ProductSection(
-          title: '钓场套餐',
-          subtitle: '钓位预约、鱼情简报和活动券',
-          products: venueProducts,
-          favoriteIds: favoriteIds,
-          cartQuantities: cartQuantities,
-          onProductTap: onProductTap,
-          onProductAdd: onProductAdd,
-          onProductFavorite: onProductFavorite,
-        ),
-        ProductSection(
-          title: '设备配件专区',
-          subtitle: '鱼漂耗材、钓箱支架和设备维护',
-          products: accessoryProducts,
-          favoriteIds: favoriteIds,
-          cartQuantities: cartQuantities,
-          onProductTap: onProductTap,
-          onProductAdd: onProductAdd,
-          onProductFavorite: onProductFavorite,
-        ),
-        ProductSection(
-          title: '热门商品',
-          subtitle: '近期高转化装备与补给',
-          products: hotProducts,
-          favoriteIds: favoriteIds,
-          cartQuantities: cartQuantities,
-          onProductTap: onProductTap,
-          onProductAdd: onProductAdd,
-          onProductFavorite: onProductFavorite,
-        ),
-        ProductSection(
-          title: '推荐商品',
-          subtitle: '按智能作钓场景优先排序',
-          action: '全部',
-          products: recommendedProducts,
-          favoriteIds: favoriteIds,
-          cartQuantities: cartQuantities,
-          onAction: onAllProductsTap,
-          onProductTap: onProductTap,
-          onProductAdd: onProductAdd,
-          onProductFavorite: onProductFavorite,
         ),
         Padding(
           padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
@@ -209,6 +191,376 @@ class MallSearchBar extends StatelessWidget {
   }
 }
 
+const _sceneSolutionEntries = [
+  _MallSolutionEntry(
+    icon: Icons.school_rounded,
+    title: '新手入门',
+    subtitle: '少踩坑，先配齐基础套装',
+    query: '新手入门',
+    color: InkPalette.pine,
+  ),
+  _MallSolutionEntry(
+    icon: Icons.nights_stay_rounded,
+    title: '夜钓',
+    subtitle: '照明、安全和轻口提醒',
+    query: '夜钓',
+    color: InkPalette.moss,
+  ),
+  _MallSolutionEntry(
+    icon: Icons.set_meal_rounded,
+    title: '路亚',
+    subtitle: '快搜、找层、陌生水域',
+    query: '路亚',
+    color: InkPalette.lake,
+  ),
+  _MallSolutionEntry(
+    icon: Icons.sports_score_rounded,
+    title: '黑坑',
+    subtitle: '抢口、钓箱和线组补给',
+    query: '黑坑',
+    color: InkPalette.reed,
+  ),
+  _MallSolutionEntry(
+    icon: Icons.terrain_rounded,
+    title: '野钓',
+    subtitle: '安全、续航和轻量装备',
+    query: '野钓',
+    color: InkPalette.pine,
+  ),
+];
+
+const _problemSolutionEntries = [
+  _MallSolutionEntry(
+    icon: Icons.visibility_rounded,
+    title: '看不清漂',
+    subtitle: '智能鱼漂和夜间提醒',
+    query: '智能鱼漂',
+    color: InkPalette.lake,
+  ),
+  _MallSolutionEntry(
+    icon: Icons.lightbulb_rounded,
+    title: '夜钓找位',
+    subtitle: '夜钓灯、头灯和安全定位',
+    query: '夜钓灯',
+    color: InkPalette.moss,
+  ),
+  _MallSolutionEntry(
+    icon: Icons.battery_charging_full_rounded,
+    title: '设备没电',
+    subtitle: '电池仓、充电和配件',
+    query: '电池',
+    color: InkPalette.reed,
+  ),
+  _MallSolutionEntry(
+    icon: Icons.edit_note_rounded,
+    title: '想记录鱼获',
+    subtitle: '自动报告和设备联动',
+    query: '作钓报告',
+    color: InkPalette.pine,
+  ),
+];
+
+class _MallSolutionEntry {
+  const _MallSolutionEntry({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.query,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String query;
+  final Color color;
+}
+
+class _MallShoppingModeStrip extends StatelessWidget {
+  const _MallShoppingModeStrip({
+    required this.onSceneTap,
+    required this.onProblemTap,
+    required this.onDeviceTap,
+    required this.onMemberTap,
+  });
+
+  final VoidCallback onSceneTap;
+  final VoidCallback onProblemTap;
+  final VoidCallback onDeviceTap;
+  final VoidCallback onMemberTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _MallModeItem(
+        icon: Icons.explore_rounded,
+        title: '按场景买',
+        subtitle: '夜钓/野钓',
+        color: InkPalette.pine,
+        onTap: onSceneTap,
+      ),
+      _MallModeItem(
+        icon: Icons.tips_and_updates_rounded,
+        title: '按问题买',
+        subtitle: '鱼口/风浪',
+        color: InkPalette.lake,
+        onTap: onProblemTap,
+      ),
+      _MallModeItem(
+        icon: Icons.sensors_rounded,
+        title: '智能设备',
+        subtitle: '鱼漂/探鱼',
+        color: InkPalette.moss,
+        onTap: onDeviceTap,
+      ),
+      _MallModeItem(
+        icon: Icons.workspace_premium_rounded,
+        title: '会员权益',
+        subtitle: '券/延保',
+        color: InkPalette.reed,
+        onTap: onMemberTap,
+      ),
+    ];
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(18.w, 10.h, 18.w, 0),
+      child: InkGlassCard(
+        padding: EdgeInsets.all(10.r),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const InkCommercialVisual(
+                  kind: InkVisualTileKind.mall,
+                  width: 48,
+                  height: 48,
+                  radius: 14,
+                  borderColor: Colors.transparent,
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '补给方式',
+                        style: TextStyle(
+                          color: InkPalette.text,
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        '按场景、问题、设备或会员权益快速进入',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: InkPalette.muted,
+                          fontSize: 10.8.sp,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10.h),
+            Row(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  Expanded(
+                    child: InkEntrance(
+                      delay: Duration(milliseconds: 35 * i),
+                      offset: 6,
+                      child: _MallModeTile(item: items[i]),
+                    ),
+                  ),
+                  if (i != items.length - 1) SizedBox(width: 8.w),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MallModeTile extends StatelessWidget {
+  const _MallModeTile({required this.item});
+
+  final _MallModeItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkPressable(
+      onTap: item.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        constraints: BoxConstraints(minHeight: 76.h),
+        padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: item.color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(15.r),
+          border: Border.all(color: item.color.withValues(alpha: 0.12)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(item.icon, color: item.color, size: 18.w),
+            const Spacer(),
+            Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.text,
+                fontSize: 11.5.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(height: 2.h),
+            Text(
+              item.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.muted,
+                fontSize: 9.5.sp,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MallModeItem {
+  const _MallModeItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+}
+
+class _MallSolutionGuideSection extends StatelessWidget {
+  const _MallSolutionGuideSection({
+    required this.title,
+    required this.subtitle,
+    required this.entries,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<_MallSolutionEntry> entries;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkSectionHeader(title: title, subtitle: subtitle),
+        SizedBox(
+          height: 106.h,
+          child: ListView.separated(
+            padding: EdgeInsets.symmetric(horizontal: 18.w),
+            physics: const BouncingScrollPhysics(),
+            scrollDirection: Axis.horizontal,
+            itemCount: entries.length,
+            separatorBuilder: (_, _) => SizedBox(width: 10.w),
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              return _MallSolutionCard(
+                entry: entry,
+                onTap: () => onTap(entry.query),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MallSolutionCard extends StatelessWidget {
+  const _MallSolutionCard({required this.entry, required this.onTap});
+
+  final _MallSolutionEntry entry;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 156.w,
+      child: InkCard(
+        padding: EdgeInsets.all(10.r),
+        borderColor: entry.color.withValues(alpha: 0.16),
+        color: entry.color.withValues(alpha: 0.07),
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                InkIconMark(
+                  icon: entry.icon,
+                  color: entry.color,
+                  size: 30,
+                  iconSize: 15,
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: entry.color,
+                  size: 18.w,
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              entry.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.text,
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              entry.subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.muted,
+                fontSize: 11.sp,
+                height: 1.22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class MallBanner extends StatelessWidget {
   const MallBanner({
     super.key,
@@ -226,17 +578,17 @@ class MallBanner extends StatelessWidget {
     return InkPressable(
       onTap: onTap,
       child: Container(
-        constraints: BoxConstraints(minHeight: 176.h),
-        padding: EdgeInsets.all(16.r),
+        constraints: BoxConstraints(minHeight: 138.h),
+        padding: EdgeInsets.all(12.r),
         decoration: BoxDecoration(
           color: InkPalette.ink,
-          borderRadius: BorderRadius.circular(22.r),
+          borderRadius: BorderRadius.circular(20.r),
           border: Border.all(color: InkPalette.lake.withValues(alpha: 0.32)),
           boxShadow: [
             BoxShadow(
               color: InkPalette.ink.withValues(alpha: 0.16),
-              blurRadius: 22,
-              offset: Offset(0, 12.h),
+              blurRadius: 18,
+              offset: Offset(0, 9.h),
             ),
           ],
         ),
@@ -253,31 +605,31 @@ class MallBanner extends StatelessWidget {
                     color: InkPalette.lake,
                     dark: true,
                   ),
-                  SizedBox(height: 12.h),
+                  SizedBox(height: 8.h),
                   Text(
                     '智能鱼漂 Pro',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: InkPalette.white,
-                      fontSize: 25.sp,
+                      fontSize: 21.sp,
                       height: 1.02,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(height: 7.h),
+                  SizedBox(height: 5.h),
                   Text(
                     '漂相识别、咬口提醒、夜钓联动，搭配 Pro 会员价更划算。',
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: InkPalette.white.withValues(alpha: 0.76),
-                      fontSize: 12.5.sp,
-                      height: 1.35,
+                      fontSize: 11.5.sp,
+                      height: 1.25,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  SizedBox(height: 14.h),
+                  SizedBox(height: 10.h),
                   Row(
                     children: [
                       _BannerMetric(value: '¥359', label: '会员价'),
@@ -287,8 +639,8 @@ class MallBanner extends StatelessWidget {
                       InkPressable(
                         onTap: onCartTap,
                         child: Container(
-                          constraints: BoxConstraints(minHeight: 36.h),
-                          padding: EdgeInsets.symmetric(horizontal: 12.w),
+                          constraints: BoxConstraints(minHeight: 32.h),
+                          padding: EdgeInsets.symmetric(horizontal: 10.w),
                           decoration: BoxDecoration(
                             color: InkPalette.reed,
                             borderRadius: BorderRadius.circular(999.r),
@@ -300,7 +652,7 @@ class MallBanner extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: InkPalette.ink,
-                              fontSize: 12.sp,
+                              fontSize: 11.5.sp,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -311,18 +663,18 @@ class MallBanner extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(width: 12.w),
+            SizedBox(width: 10.w),
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const InkCommercialVisual(
                   kind: InkVisualTileKind.mall,
-                  width: 118,
-                  height: 118,
-                  radius: 24,
+                  width: 88,
+                  height: 88,
+                  radius: 20,
                   borderColor: Colors.transparent,
                 ),
-                SizedBox(height: 8.h),
+                SizedBox(height: 6.h),
                 _MiniPill(
                   label: '夜钓套装',
                   icon: Icons.nights_stay_rounded,
@@ -357,7 +709,7 @@ class MallCategoryGrid extends StatelessWidget {
       children: [
         const InkSectionHeader(title: '商品分类', subtitle: '设备、场景、配件和会员权益'),
         SizedBox(
-          height: 146.h,
+          height: 126.h,
           child: GridView.builder(
             padding: EdgeInsets.symmetric(horizontal: 18.w),
             physics: const BouncingScrollPhysics(),
@@ -365,9 +717,9 @@ class MallCategoryGrid extends StatelessWidget {
             itemCount: categories.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisSpacing: 10.w,
-              crossAxisSpacing: 10.h,
-              childAspectRatio: 0.52,
+              mainAxisSpacing: 8.w,
+              crossAxisSpacing: 8.h,
+              childAspectRatio: 0.56,
             ),
             itemBuilder: (context, index) {
               final category = categories[index];
@@ -423,7 +775,7 @@ class SmartDeviceSection extends StatelessWidget {
           )
         else
           SizedBox(
-            height: 356.h,
+            height: 318.h,
             child: ListView.separated(
               padding: EdgeInsets.symmetric(horizontal: 18.w),
               physics: const BouncingScrollPhysics(),
@@ -470,9 +822,9 @@ class SmartDeviceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _categoryColor(product.category);
     return SizedBox(
-      width: 292.w,
+      width: 270.w,
       child: InkCard(
-        padding: EdgeInsets.all(12.r),
+        padding: EdgeInsets.all(10.r),
         onTap: onTap,
         borderColor: color.withValues(alpha: 0.22),
         child: Column(
@@ -482,11 +834,11 @@ class SmartDeviceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  width: 96.w,
-                  height: 96.h,
+                  width: 82.w,
+                  height: 82.h,
                   child: _ProductVisual(product: product),
                 ),
-                SizedBox(width: 11.w),
+                SizedBox(width: 9.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,7 +852,7 @@ class SmartDeviceCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: InkPalette.text,
-                                fontSize: 17.sp,
+                                fontSize: 15.sp,
                                 height: 1.14,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -518,14 +870,14 @@ class SmartDeviceCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      SizedBox(height: 7.h),
+                      SizedBox(height: 5.h),
                       Text(
                         product.scene,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: InkPalette.muted,
-                          fontSize: 12.sp,
+                          fontSize: 11.sp,
                           height: 1.25,
                           fontWeight: FontWeight.w800,
                         ),
@@ -535,25 +887,25 @@ class SmartDeviceCard extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: 12.h),
+            SizedBox(height: 8.h),
             Text(
               '核心能力',
               style: TextStyle(
                 color: InkPalette.text,
-                fontSize: 12.sp,
+                fontSize: 11.5.sp,
                 fontWeight: FontWeight.w900,
               ),
             ),
-            SizedBox(height: 7.h),
+            SizedBox(height: 5.h),
             Wrap(
               spacing: 6.w,
               runSpacing: 6.h,
               children: [
-                for (final feature in product.features.take(4))
+                for (final feature in product.features.take(3))
                   _MiniPill(label: feature, color: color),
               ],
             ),
-            SizedBox(height: 10.h),
+            SizedBox(height: 7.h),
             Wrap(
               spacing: 6.w,
               runSpacing: 6.h,
@@ -591,7 +943,7 @@ class SmartDeviceCard extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: 12.h),
+            SizedBox(height: 9.h),
             Row(
               children: [
                 Expanded(
@@ -777,6 +1129,7 @@ class ProductSection extends StatelessWidget {
     this.action,
     this.onAction,
     this.emptyText = '暂无商品',
+    this.compact = false,
   });
 
   final String title;
@@ -790,6 +1143,7 @@ class ProductSection extends StatelessWidget {
   final ValueChanged<MallProduct> onProductAdd;
   final ValueChanged<MallProduct> onProductFavorite;
   final String emptyText;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -810,6 +1164,7 @@ class ProductSection extends StatelessWidget {
         else
           _HorizontalProducts(
             products: products,
+            compact: compact,
             favoriteIds: favoriteIds,
             cartQuantities: cartQuantities,
             onProductTap: onProductTap,
@@ -831,6 +1186,7 @@ class ProductCard extends StatelessWidget {
     required this.onAdd,
     required this.onFavorite,
     this.width = 178,
+    this.compact = false,
   });
 
   final MallProduct product;
@@ -840,31 +1196,38 @@ class ProductCard extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onFavorite;
   final double width;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final accent = _categoryColor(product.category);
+    final sceneChips = product.recommendedFor.isEmpty
+        ? product.tags
+        : product.recommendedFor;
     final chips = <String>[
-      ...product.tags.take(2),
+      ...sceneChips.take(2),
       if (product.supportDeviceLink) 'App联动',
     ];
+    final imageHeight = compact ? 68.h : 82.h;
+    final chipAreaHeight = compact ? 24.h : 34.h;
+    final chipLimit = compact ? 2 : 3;
 
     return SizedBox(
       width: width.w,
       child: InkCard(
-        padding: EdgeInsets.all(11.r),
+        padding: EdgeInsets.all(compact ? 9.r : 11.r),
         onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              height: 96.h,
+              height: imageHeight,
               child: Stack(
                 children: [
                   Positioned.fill(child: _ProductVisual(product: product)),
                   Positioned(
-                    left: 7.w,
-                    top: 7.h,
+                    left: 6.w,
+                    top: 6.h,
                     child: _MiniPill(
                       label: product.badge.isEmpty
                           ? product.category.label
@@ -874,8 +1237,8 @@ class ProductCard extends StatelessWidget {
                   ),
                   if (product.isSmartDevice)
                     Positioned(
-                      left: 7.w,
-                      bottom: 7.h,
+                      left: 6.w,
+                      bottom: 6.h,
                       child: _MiniPill(
                         label: '智能',
                         icon: Icons.settings_input_antenna_rounded,
@@ -884,8 +1247,8 @@ class ProductCard extends StatelessWidget {
                     ),
                   if (quantity > 0)
                     Positioned(
-                      right: 7.w,
-                      bottom: 7.h,
+                      right: 6.w,
+                      bottom: 6.h,
                       child: _MiniPill(
                         label: '已加 $quantity',
                         color: InkPalette.cinnabar,
@@ -897,8 +1260,8 @@ class ProductCard extends StatelessWidget {
                     child: InkPressable(
                       onTap: onFavorite,
                       child: Container(
-                        width: 30.w,
-                        height: 30.w,
+                        width: 28.w,
+                        height: 28.w,
                         decoration: BoxDecoration(
                           color: InkPalette.white.withValues(alpha: 0.88),
                           shape: BoxShape.circle,
@@ -910,7 +1273,7 @@ class ProductCard extends StatelessWidget {
                           color: favorite
                               ? InkPalette.cinnabar
                               : InkPalette.muted,
-                          size: 17.w,
+                          size: 16.w,
                         ),
                       ),
                     ),
@@ -918,35 +1281,26 @@ class ProductCard extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(height: 9.h),
+            SizedBox(height: compact ? 5.h : 7.h),
             Text(
               product.name,
-              maxLines: 2,
+              maxLines: compact ? 1 : 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: InkPalette.text,
-                fontSize: 13.sp,
+                fontSize: compact ? 12.sp : 12.5.sp,
                 height: 1.18,
                 fontWeight: FontWeight.w900,
               ),
             ),
-            SizedBox(height: 5.h),
+            SizedBox(height: compact ? 3.h : 4.h),
             Row(
               children: [
-                Icon(Icons.star_rounded, color: InkPalette.reed, size: 13.w),
-                SizedBox(width: 2.w),
-                Text(
-                  product.rating.toStringAsFixed(1),
-                  style: TextStyle(
-                    color: InkPalette.text,
-                    fontSize: 10.5.sp,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(width: 7.w),
+                Icon(Icons.auto_awesome_rounded, color: accent, size: 13.w),
+                SizedBox(width: 4.w),
                 Expanded(
                   child: Text(
-                    '销量 ${product.sales}',
+                    product.scene,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -958,19 +1312,19 @@ class ProductCard extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: 6.h),
+            SizedBox(height: compact ? 4.h : 5.h),
             SizedBox(
-              height: 44.h,
+              height: chipAreaHeight,
               child: Wrap(
                 spacing: 5.w,
-                runSpacing: 5.h,
+                runSpacing: 4.h,
                 children: [
-                  for (final chip in chips.take(3))
+                  for (final chip in chips.take(chipLimit))
                     _MiniPill(label: chip, color: accent),
                 ],
               ),
             ),
-            SizedBox(height: 8.h),
+            SizedBox(height: compact ? 5.h : 6.h),
             Row(
               children: [
                 Expanded(
@@ -1151,6 +1505,7 @@ class _HorizontalProducts extends StatelessWidget {
     required this.onProductTap,
     required this.onProductAdd,
     required this.onProductFavorite,
+    this.compact = false,
   });
 
   final List<MallProduct> products;
@@ -1159,11 +1514,12 @@ class _HorizontalProducts extends StatelessWidget {
   final ValueChanged<MallProduct> onProductTap;
   final ValueChanged<MallProduct> onProductAdd;
   final ValueChanged<MallProduct> onProductFavorite;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 274.h,
+      height: compact ? 210.h : 248.h,
       child: ListView.separated(
         padding: EdgeInsets.symmetric(horizontal: 18.w),
         physics: const BouncingScrollPhysics(),
@@ -1174,6 +1530,8 @@ class _HorizontalProducts extends StatelessWidget {
           final product = products[index];
           return ProductCard(
             product: product,
+            compact: compact,
+            width: compact ? 154 : 178,
             quantity: cartQuantities[product.id] ?? 0,
             favorite: favoriteIds.contains(product.id),
             onTap: () => onProductTap(product),

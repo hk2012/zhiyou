@@ -159,8 +159,8 @@ class InkBackdrop extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [
               InkPalette.white,
-              InkPalette.rice,
-              InkPalette.mist.withValues(alpha: 0.26),
+              const Color(0xFFF7FBF8),
+              InkPalette.mist.withValues(alpha: 0.34),
             ],
           ),
         ),
@@ -177,7 +177,7 @@ class _ModernBackdropPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final gridPaint = Paint()
-      ..color = InkPalette.line.withValues(alpha: 0.30)
+      ..color = InkPalette.line.withValues(alpha: 0.22)
       ..strokeWidth = 1;
     const step = 48.0;
     for (double x = 0; x < size.width; x += step) {
@@ -191,7 +191,7 @@ class _ModernBackdropPainter extends CustomPainter {
       ..shader =
           RadialGradient(
             colors: [
-              InkPalette.lake.withValues(alpha: 0.12),
+              InkPalette.lake.withValues(alpha: 0.14),
               Colors.transparent,
             ],
           ).createShader(
@@ -201,6 +201,39 @@ class _ModernBackdropPainter extends CustomPainter {
             ),
           );
     canvas.drawRect(Offset.zero & size, glowPaint);
+
+    final warmGlowPaint = Paint()
+      ..shader =
+          RadialGradient(
+            colors: [
+              InkPalette.reed.withValues(alpha: 0.10),
+              Colors.transparent,
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(size.width * 0.08, size.height * 0.18),
+              radius: size.width * 0.58,
+            ),
+          );
+    canvas.drawRect(Offset.zero & size, warmGlowPaint);
+
+    final waterPaint = Paint()
+      ..color = InkPalette.pine.withValues(alpha: 0.035)
+      ..style = PaintingStyle.fill;
+    final waterPath = Path()
+      ..moveTo(0, size.height * 0.76)
+      ..cubicTo(
+        size.width * 0.28,
+        size.height * 0.70,
+        size.width * 0.56,
+        size.height * 0.84,
+        size.width,
+        size.height * 0.76,
+      )
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(waterPath, waterPaint);
   }
 
   @override
@@ -227,6 +260,61 @@ class InkPressable extends StatefulWidget {
 
   @override
   State<InkPressable> createState() => _InkPressableState();
+}
+
+class InkEntrance extends StatefulWidget {
+  const InkEntrance({
+    super.key,
+    required this.child,
+    this.delay = Duration.zero,
+    this.offset = 10,
+  });
+
+  final Widget child;
+  final Duration delay;
+  final double offset;
+
+  @override
+  State<InkEntrance> createState() => _InkEntranceState();
+}
+
+class _InkEntranceState extends State<InkEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _curve;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: AppDurations.slow);
+    _curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    Future<void>.delayed(widget.delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _curve,
+      child: widget.child,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _curve.value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - _curve.value) * widget.offset.h),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _InkPressableState extends State<InkPressable>
@@ -491,9 +579,9 @@ class InkTopBar extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.page.w,
-        AppSpacing.md.h,
-        AppSpacing.page.w,
         AppSpacing.sm.h,
+        AppSpacing.page.w,
+        AppSpacing.xs.h,
       ),
       child: Row(
         children: [
@@ -514,13 +602,13 @@ class InkTopBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: InkPalette.text,
-                    fontSize: 26.sp,
+                    fontSize: 24.sp,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
                     fontFamilyFallback: brushFontFallback,
                   ),
                 ),
-                SizedBox(height: 4.h),
+                SizedBox(height: 3.h),
                 if (subtitle != null)
                   Text(
                     subtitle!,
@@ -528,7 +616,7 @@ class InkTopBar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: InkPalette.muted,
-                      fontSize: 12.sp,
+                      fontSize: 11.5.sp,
                       fontWeight: FontWeight.w900,
                       fontFamilyFallback: inkFontFallback,
                     ),
@@ -570,7 +658,7 @@ class InkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = Container(
       margin: margin,
-      padding: padding ?? EdgeInsets.all(AppSpacing.xl.r),
+      padding: padding ?? EdgeInsets.all(14.r),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: color ?? InkPalette.white.withValues(alpha: 0.96),
@@ -607,8 +695,8 @@ class InkGlassCard extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: InkCard(
           padding: padding,
-          color: InkPalette.white.withValues(alpha: 0.92),
-          borderColor: InkPalette.line.withValues(alpha: 0.88),
+          color: InkPalette.white.withValues(alpha: 0.88),
+          borderColor: InkPalette.white.withValues(alpha: 0.74),
           onTap: onTap,
           child: child,
         ),
@@ -636,9 +724,9 @@ class InkSectionHeader extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.page.w,
-        AppSpacing.section.h,
+        14.h,
         AppSpacing.page.w,
-        AppSpacing.md.h,
+        5.h,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -651,19 +739,19 @@ class InkSectionHeader extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color: InkPalette.text,
-                    fontSize: 18.sp,
+                    fontSize: 17.sp,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
                     fontFamilyFallback: inkFontFallback,
                   ),
                 ),
-                SizedBox(height: 4.h),
+                SizedBox(height: 2.h),
                 if (subtitle != null)
                   Text(
                     subtitle!,
                     style: TextStyle(
                       color: InkPalette.muted,
-                      fontSize: 12.5.sp,
+                      fontSize: 11.5.sp,
                       fontWeight: FontWeight.w900,
                       fontFamilyFallback: inkFontFallback,
                     ),
@@ -675,24 +763,103 @@ class InkSectionHeader extends StatelessWidget {
             GestureDetector(
               onTap: onAction,
               behavior: HitTestBehavior.opaque,
-              child: Row(
-                children: [
-                  Text(
-                    action!,
-                    style: TextStyle(
-                      color: InkPalette.pine,
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w900,
+              child: Container(
+                constraints: BoxConstraints(minHeight: 34.h),
+                padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 5.h),
+                alignment: Alignment.center,
+                child: Row(
+                  children: [
+                    Text(
+                      action!,
+                      style: TextStyle(
+                        color: InkPalette.pine,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: InkPalette.pine,
-                    size: 16.w,
-                  ),
-                ],
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: InkPalette.pine,
+                      size: 16.w,
+                    ),
+                  ],
+                ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class InkRouteContextBanner extends StatelessWidget {
+  const InkRouteContextBanner({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    this.trailing = '承接',
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String trailing;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkCard(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+      color: color.withValues(alpha: 0.08),
+      borderColor: color.withValues(alpha: 0.16),
+      onTap: onTap,
+      child: Row(
+        children: [
+          InkIconMark(icon: icon, color: color, size: 32, iconSize: 16),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.text,
+                    fontSize: 12.5.sp,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: InkPalette.muted,
+                    fontSize: 10.8.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Text(
+            trailing,
+            maxLines: 1,
+            style: TextStyle(
+              color: color,
+              fontSize: 11.5.sp,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: color, size: 16.w),
         ],
       ),
     );
@@ -968,7 +1135,7 @@ class InkPrimaryButton extends StatelessWidget {
     return InkPressable(
       onTap: busy ? null : onTap,
       child: Container(
-        height: 48.h,
+        height: 44.h,
         padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg.w),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -978,8 +1145,8 @@ class InkPrimaryButton extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: color.withValues(alpha: 0.24),
-              blurRadius: 20,
-              offset: Offset(0, 10.h),
+              blurRadius: 14,
+              offset: Offset(0, 7.h),
             ),
           ],
         ),
@@ -992,8 +1159,8 @@ class InkPrimaryButton extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (icon != null) ...[
-                        Icon(icon, color: InkPalette.white, size: 17.w),
-                        SizedBox(width: 6.w),
+                        Icon(icon, color: InkPalette.white, size: 16.w),
+                        SizedBox(width: 5.w),
                       ],
                       Text(
                         label,
@@ -1001,7 +1168,7 @@ class InkPrimaryButton extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: InkPalette.white,
-                          fontSize: 14.5.sp,
+                          fontSize: 13.5.sp,
                           height: 1.15,
                           fontWeight: FontWeight.w900,
                         ),
@@ -1034,7 +1201,7 @@ class InkSecondaryButton extends StatelessWidget {
     return InkPressable(
       onTap: onTap,
       child: Container(
-        height: 48.h,
+        height: 44.h,
         padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg.w),
         decoration: BoxDecoration(
           color: InkPalette.white.withValues(alpha: 0.78),
@@ -1048,8 +1215,8 @@ class InkSecondaryButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, color: color, size: 17.w),
-                  SizedBox(width: 6.w),
+                  Icon(icon, color: color, size: 16.w),
+                  SizedBox(width: 5.w),
                 ],
                 Text(
                   label,
@@ -1057,7 +1224,7 @@ class InkSecondaryButton extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: color,
-                    fontSize: 14.5.sp,
+                    fontSize: 13.5.sp,
                     height: 1.15,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1784,6 +1951,7 @@ class InkSheetAction {
     required this.title,
     required this.subtitle,
     this.color = InkPalette.pine,
+    this.trailing,
     this.onTap,
   });
 
@@ -1791,6 +1959,7 @@ class InkSheetAction {
   final String title;
   final String subtitle;
   final Color color;
+  final String? trailing;
   final VoidCallback? onTap;
 }
 
@@ -1863,17 +2032,20 @@ void showInkActionSheet(
                           onTap: () {
                             final action = actions[i];
                             Navigator.of(sheetContext).pop();
-                            if (action.onTap != null) {
-                              action.onTap!.call();
-                            } else {
-                              _showInkActionFallback(context, action);
-                            }
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!context.mounted) return;
+                              if (action.onTap != null) {
+                                action.onTap!.call();
+                              } else {
+                                _showInkActionFallback(context, action);
+                              }
+                            });
                           },
                           child: InkInfoRow(
                             icon: actions[i].icon,
                             title: actions[i].title,
                             subtitle: actions[i].subtitle,
-                            trailing: '进入',
+                            trailing: actions[i].trailing ?? '进入',
                             color: actions[i].color,
                           ),
                         ),

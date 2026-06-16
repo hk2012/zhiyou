@@ -41,18 +41,6 @@ class ProfileScreen extends ConsumerWidget {
     final member = isLoggedIn
         ? profileUser.member
         : ProfileMockData.inactiveMember;
-    final ordersSummary = isLoggedIn
-        ? ProfileMockData.ordersSummary
-        : ProfileMockData.emptyOrdersSummary;
-    final appointments = isLoggedIn
-        ? ProfileMockData.appointments
-        : ProfileMockData.emptyAppointments;
-    final events = isLoggedIn
-        ? ProfileMockData.events
-        : ProfileMockData.emptyEvents;
-    final coupons = isLoggedIn
-        ? ProfileMockData.coupons
-        : ProfileMockData.emptyCoupons;
     final user = userState.maybeWhen(
       data: (value) => value,
       orElse: () => null,
@@ -67,7 +55,7 @@ class ProfileScreen extends ConsumerWidget {
         physics: const BouncingScrollPhysics(),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewPadding.bottom + 116.h,
+          bottom: MediaQuery.of(context).viewPadding.bottom + 92.h,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,7 +98,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
             _ProfileContentPadding(
               motionIndex: 2,
-              top: 8,
+              top: 5,
               child: ProfileHeader(
                 nickname: isLoggedIn ? user?.nickname ?? '江湖钓客' : '未登录用户',
                 identityText: isLoggedIn
@@ -140,17 +128,9 @@ class ProfileScreen extends ConsumerWidget {
                     : _goProfileRoute(context, AppRouteNames.login),
               ),
             ),
-            _ProfileContentPadding(
-              motionIndex: 3,
-              child: MembershipCard(
-                member: member,
-                onOpen: () => _goProfileRoute(context, AppRouteNames.mall),
-                onBenefit: () => _showMembershipSheet(context, member),
-              ),
-            ),
             _ProfileSectionHeader(
-              title: '我的智能装备',
-              subtitle: '鱼漂、钓箱、钓台、钓伞的状态与服务',
+              title: '智能装备',
+              subtitle: '只看当前状态',
               action: '管理',
               onAction: () => _showDeviceServiceSheet(context, visibleDevices),
             ),
@@ -169,59 +149,9 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             _ProfileSectionHeader(
-              title: '设备售后',
-              subtitle: '保修、维修、固件、绑定和配件服务',
-              action: '客服',
-              onAction: () => _showSupportSheet(
-                context,
-                ProfileMockData.deviceServices.last,
-              ),
-            ),
-            _ProfileContentPadding(
-              motionIndex: 5,
-              top: 0,
-              child: DeviceServiceSection(
-                deviceCount: devicesSummary.total,
-                onTap: (item) => _showSupportSheet(context, item),
-              ),
-            ),
-            _ProfileSectionHeader(
-              title: '订单快捷入口',
-              subtitle: '全部订单、履约状态和退款售后',
-              action: '全部订单',
-              onAction: () => ordersSummary.entries.isEmpty
-                  ? _goProfileRoute(context, AppRouteNames.mall)
-                  : _showOrderSheet(context, ordersSummary.entries.first),
-            ),
-            _ProfileContentPadding(
-              motionIndex: 6,
-              top: 0,
-              child: OrderShortcutGrid(
-                summary: ordersSummary,
-                onOrderTap: (item) => _showOrderSheet(context, item),
-              ),
-            ),
-            _ProfileSectionHeader(
-              title: '钓场资产入口',
-              subtitle: '预约、钓位、赛事、活动券和收藏',
-              action: '钓场',
-              onAction: () => _goProfileRoute(context, AppRouteNames.explore),
-            ),
-            _ProfileContentPadding(
-              motionIndex: 7,
-              top: 0,
-              child: ReservationEventSection(
-                appointments: appointments,
-                events: events,
-                onExplore: () =>
-                    _goProfileRoute(context, AppRouteNames.explore),
-                onEvent: (item) => _showReservationSheet(context, item),
-              ),
-            ),
-            _ProfileSectionHeader(
-              title: '作钓数据入口',
-              subtitle: '记录、报告、渔获、装备使用和数据分析',
-              action: '作钓报告',
+              title: '作钓数据',
+              subtitle: '鱼获、钓点和活跃天数',
+              action: '报告',
               onAction: () => _showFishingAssetSheet(
                 context,
                 ProfileMockData.fishingStats.entries[1],
@@ -241,16 +171,29 @@ class ProfileScreen extends ConsumerWidget {
                 onAssetTap: (item) => _showFishingAssetSheet(context, item),
               ),
             ),
-            _ProfileSectionHeader(
-              title: '用户资产入口',
-              subtitle: '优惠券、积分成长、收藏和浏览记录',
-            ),
             _ProfileContentPadding(
               motionIndex: 9,
-              top: 0,
-              child: WalletAssetSection(
-                coupons: coupons,
-                onTap: (item) => _showWalletSheet(context, item),
+              top: 10,
+              child: _ProfileServiceDock(
+                member: member,
+                onAll: () => _showProfileMoreSheet(context, member),
+                onMember: () => _showMembershipSheet(context, member),
+                onOrder: () => _showOrderSheet(
+                  context,
+                  ProfileMockData.ordersSummary.entries.first,
+                ),
+                onReservation: () => _showReservationSheet(
+                  context,
+                  ProfileMockData.appointments.entries.first,
+                ),
+                onWallet: () => _showWalletSheet(
+                  context,
+                  ProfileMockData.coupons.entries.first,
+                ),
+                onSupport: () => _showSupportSheet(
+                  context,
+                  ProfileMockData.deviceServices.last,
+                ),
               ),
             ),
             _ProfileContentPadding(
@@ -283,6 +226,61 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
+void _showProfileMoreSheet(BuildContext context, ProfileMemberState member) {
+  showInkActionSheet(
+    context,
+    title: '更多资产与服务',
+    subtitle: '订单、预约、钱包和售后集中放在这里',
+    icon: Icons.account_balance_wallet_rounded,
+    color: InkPalette.lake,
+    actions: [
+      InkSheetAction(
+        icon: Icons.workspace_premium_rounded,
+        title: '会员权益',
+        subtitle: member.summary,
+        color: InkPalette.reed,
+        onTap: () => _showMembershipSheet(context, member),
+      ),
+      InkSheetAction(
+        icon: Icons.receipt_long_rounded,
+        title: '我的订单',
+        subtitle: '查看待付款、发货和售后状态',
+        color: InkPalette.pine,
+        onTap: () => _showOrderSheet(
+          context,
+          ProfileMockData.ordersSummary.entries.first,
+        ),
+      ),
+      InkSheetAction(
+        icon: Icons.event_available_rounded,
+        title: '钓场预约',
+        subtitle: '查看预约、活动和收藏钓点',
+        color: InkPalette.moss,
+        onTap: () => _showReservationSheet(
+          context,
+          ProfileMockData.appointments.entries.first,
+        ),
+      ),
+      InkSheetAction(
+        icon: Icons.confirmation_number_rounded,
+        title: '优惠券与积分',
+        subtitle: '查看优惠券、积分和收藏',
+        color: InkPalette.reed,
+        onTap: () =>
+            _showWalletSheet(context, ProfileMockData.coupons.entries.first),
+      ),
+      InkSheetAction(
+        icon: Icons.support_agent_rounded,
+        title: '设备售后',
+        subtitle: '保修、维修、固件和配件服务',
+        color: InkPalette.lake,
+        onTap: () =>
+            _showSupportSheet(context, ProfileMockData.deviceServices.last),
+      ),
+    ],
+  );
+}
+
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
     super.key,
@@ -310,7 +308,7 @@ class ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkCard(
-      padding: EdgeInsets.all(16.r),
+      padding: EdgeInsets.all(12.r),
       color: InkPalette.white.withValues(alpha: 0.97),
       borderColor: InkPalette.lake.withValues(alpha: 0.16),
       child: Column(
@@ -320,7 +318,7 @@ class ProfileHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _ProfileAvatar(avatarUrl: avatarUrl),
-              SizedBox(width: 13.w),
+              SizedBox(width: 10.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,7 +332,7 @@ class ProfileHeader extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: InkPalette.text,
-                              fontSize: 22.sp,
+                              fontSize: 19.sp,
                               height: 1.1,
                               fontWeight: FontWeight.w900,
                             ),
@@ -348,23 +346,23 @@ class ProfileHeader extends StatelessWidget {
                         ),
                       ],
                     ),
-                    SizedBox(height: 6.h),
+                    SizedBox(height: 4.h),
                     Text(
                       identityText,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: InkPalette.muted,
-                        fontSize: 12.5.sp,
+                        fontSize: 11.5.sp,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 9.h),
+                    SizedBox(height: 6.h),
                     Wrap(
-                      spacing: 7.w,
-                      runSpacing: 7.h,
+                      spacing: 6.w,
+                      runSpacing: 5.h,
                       children: [
-                        for (final tag in tags.take(4))
+                        for (final tag in tags.take(3))
                           _ProfileTag(label: tag, color: _tagColor(tag)),
                       ],
                     ),
@@ -373,7 +371,7 @@ class ProfileHeader extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 15.h),
+          SizedBox(height: 10.h),
           Row(
             children: [
               Expanded(
@@ -384,7 +382,7 @@ class ProfileHeader extends StatelessWidget {
                   color: InkPalette.moss,
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 7.w),
               Expanded(
                 child: _HeaderMetric(
                   value: profileProgress,
@@ -393,7 +391,7 @@ class ProfileHeader extends StatelessWidget {
                   color: InkPalette.reed,
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 7.w),
               Expanded(
                 child: _HeaderMetric(
                   value: membershipValue,
@@ -404,7 +402,7 @@ class ProfileHeader extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 13.h),
+          SizedBox(height: 9.h),
           InkSecondaryButton(
             label: '编辑资料',
             icon: Icons.edit_rounded,
@@ -458,7 +456,7 @@ class MembershipCard extends StatelessWidget {
       pressedScale: 0.985,
       rippleColor: InkPalette.reed,
       child: Container(
-        padding: EdgeInsets.all(15.r),
+        padding: EdgeInsets.all(12.r),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22.r),
           gradient: const LinearGradient(
@@ -481,11 +479,11 @@ class MembershipCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 48.w,
-                  height: 48.w,
+                  width: 40.w,
+                  height: 40.w,
                   decoration: BoxDecoration(
                     color: InkPalette.white.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(16.r),
+                    borderRadius: BorderRadius.circular(14.r),
                     border: Border.all(
                       color: InkPalette.white.withValues(alpha: 0.24),
                     ),
@@ -493,10 +491,10 @@ class MembershipCard extends StatelessWidget {
                   child: Icon(
                     Icons.workspace_premium_rounded,
                     color: InkPalette.reed,
-                    size: 25.w,
+                    size: 21.w,
                   ),
                 ),
-                SizedBox(width: 12.w),
+                SizedBox(width: 10.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -507,18 +505,18 @@ class MembershipCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: InkPalette.white,
-                          fontSize: 18.sp,
+                          fontSize: 16.sp,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      SizedBox(height: 4.h),
+                      SizedBox(height: 3.h),
                       Text(
                         subtitle,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: InkPalette.white.withValues(alpha: 0.74),
-                          fontSize: 12.sp,
+                          fontSize: 11.sp,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -529,9 +527,9 @@ class MembershipCard extends StatelessWidget {
               ],
             ),
             if (isActive) ...[
-              SizedBox(height: 12.h),
+              SizedBox(height: 9.h),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 10.h),
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
                 decoration: BoxDecoration(
                   color: InkPalette.white.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(16.r),
@@ -563,23 +561,23 @@ class MembershipCard extends StatelessWidget {
                 ),
               ),
             ],
-            SizedBox(height: 12.h),
+            SizedBox(height: 9.h),
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: ProfileMockData.proBenefits.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                mainAxisSpacing: 8.h,
-                crossAxisSpacing: 8.w,
-                childAspectRatio: 3.35,
+                mainAxisSpacing: 7.h,
+                crossAxisSpacing: 7.w,
+                childAspectRatio: 3.7,
               ),
               itemBuilder: (context, index) {
                 final benefit = ProfileMockData.proBenefits[index];
                 return _ProBenefitTile(benefit: benefit);
               },
             ),
-            SizedBox(height: 14.h),
+            SizedBox(height: 10.h),
             if (!isActive)
               UpgradePrompt(
                 title: isExpired ? '江湖钓客 Pro 已过期' : '未开通江湖钓客 Pro',
@@ -654,7 +652,7 @@ class MyDeviceSummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: EdgeInsets.all(15.r),
+            padding: EdgeInsets.all(12.r),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.vertical(top: Radius.circular(18.r)),
               gradient: LinearGradient(
@@ -674,7 +672,7 @@ class MyDeviceSummaryCard extends StatelessWidget {
                   icon: Icons.settings_input_antenna_rounded,
                   color: InkPalette.lake,
                 ),
-                SizedBox(width: 12.w),
+                SizedBox(width: 10.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -683,22 +681,22 @@ class MyDeviceSummaryCard extends StatelessWidget {
                         '我的智能装备',
                         style: TextStyle(
                           color: InkPalette.text,
-                          fontSize: 17.sp,
+                          fontSize: 15.5.sp,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      SizedBox(height: 4.h),
+                      SizedBox(height: 3.h),
                       Text(
                         '${summary.total} 台设备｜${summary.online} 台在线｜${summary.lowBattery} 台低电量',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: InkPalette.muted,
-                          fontSize: 12.sp,
+                          fontSize: 11.2.sp,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      SizedBox(height: 6.h),
+                      SizedBox(height: 4.h),
                       Row(
                         children: [
                           Icon(
@@ -724,7 +722,7 @@ class MyDeviceSummaryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                SizedBox(width: 8.w),
+                SizedBox(width: 7.w),
                 _StatusCapsule(
                   label: summary.abnormal > 0 ? '${summary.abnormal} 异常' : '稳定',
                   color: summary.abnormal > 0
@@ -736,7 +734,7 @@ class MyDeviceSummaryCard extends StatelessWidget {
           ),
           if (summary.total == 0)
             Padding(
-              padding: EdgeInsets.fromLTRB(15.w, 13.h, 15.w, 15.h),
+              padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 12.h),
               child: ProfileStateCard(
                 icon: Icons.add_link_rounded,
                 title: '还没有绑定智能装备',
@@ -751,7 +749,7 @@ class MyDeviceSummaryCard extends StatelessWidget {
           else ...[
             if (summary.abnormal > 0)
               Padding(
-                padding: EdgeInsets.fromLTRB(15.w, 13.h, 15.w, 0),
+                padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 0),
                 child: _SubtleEmphasis(
                   color: InkPalette.reed,
                   child: ProfileStateCard(
@@ -767,9 +765,9 @@ class MyDeviceSummaryCard extends StatelessWidget {
                 ),
               ),
             Padding(
-              padding: EdgeInsets.fromLTRB(15.w, 13.h, 15.w, 0),
+              padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 0),
               child: Container(
-                padding: EdgeInsets.all(13.r),
+                padding: EdgeInsets.all(10.r),
                 decoration: BoxDecoration(
                   color: InkPalette.mist.withValues(alpha: 0.45),
                   borderRadius: BorderRadius.circular(18.r),
@@ -779,8 +777,8 @@ class MyDeviceSummaryCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    _DeviceTypeIcon(type: core.type, size: 46),
-                    SizedBox(width: 12.w),
+                    _DeviceTypeIcon(type: core.type, size: 38),
+                    SizedBox(width: 10.w),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -791,11 +789,11 @@ class MyDeviceSummaryCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: InkPalette.text,
-                              fontSize: 15.sp,
+                              fontSize: 13.5.sp,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          SizedBox(height: 4.h),
+                          SizedBox(height: 3.h),
                           Text(
                             '${core.telemetryLabel} ${core.telemetryValue} · ${core.workingState}',
                             maxLines: 1,
@@ -825,7 +823,7 @@ class MyDeviceSummaryCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(15.w, 12.h, 15.w, 0),
+              padding: EdgeInsets.fromLTRB(12.w, 9.h, 12.w, 0),
               child: GridView(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -1899,10 +1897,220 @@ class _AssetEntryRow extends StatelessWidget {
   }
 }
 
+class _ProfileServiceDock extends StatelessWidget {
+  const _ProfileServiceDock({
+    required this.member,
+    required this.onAll,
+    required this.onMember,
+    required this.onOrder,
+    required this.onReservation,
+    required this.onWallet,
+    required this.onSupport,
+  });
+
+  final ProfileMemberState member;
+  final VoidCallback onAll;
+  final VoidCallback onMember;
+  final VoidCallback onOrder;
+  final VoidCallback onReservation;
+  final VoidCallback onWallet;
+  final VoidCallback onSupport;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _ProfileServiceItem(
+        icon: Icons.workspace_premium_rounded,
+        title: '会员',
+        subtitle: member.status == ProfileMemberStatus.active ? 'Pro' : '权益',
+        color: InkPalette.reed,
+        onTap: onMember,
+      ),
+      _ProfileServiceItem(
+        icon: Icons.receipt_long_rounded,
+        title: '订单',
+        subtitle: '物流/售后',
+        color: InkPalette.pine,
+        onTap: onOrder,
+      ),
+      _ProfileServiceItem(
+        icon: Icons.event_available_rounded,
+        title: '预约',
+        subtitle: '钓位/活动',
+        color: InkPalette.moss,
+        onTap: onReservation,
+      ),
+      _ProfileServiceItem(
+        icon: Icons.confirmation_number_rounded,
+        title: '钱包',
+        subtitle: '券/积分',
+        color: InkPalette.lake,
+        onTap: onWallet,
+      ),
+      _ProfileServiceItem(
+        icon: Icons.support_agent_rounded,
+        title: '售后',
+        subtitle: '设备服务',
+        color: InkPalette.reed,
+        onTap: onSupport,
+      ),
+      _ProfileServiceItem(
+        icon: Icons.dashboard_customize_rounded,
+        title: '全部',
+        subtitle: '资产服务',
+        color: InkPalette.pine,
+        onTap: onAll,
+      ),
+    ];
+
+    return InkGlassCard(
+      padding: EdgeInsets.all(10.r),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const InkCommercialVisual(
+                kind: InkVisualTileKind.achievement,
+                width: 48,
+                height: 48,
+                radius: 14,
+                borderColor: Colors.transparent,
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '资产与服务',
+                      style: TextStyle(
+                        color: InkPalette.text,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      '会员、订单、预约、钱包和售后',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: InkPalette.muted,
+                        fontSize: 10.8.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              InkPressable(
+                onTap: onAll,
+                child: Text(
+                  '全部',
+                  style: TextStyle(
+                    color: InkPalette.lake,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 8.h,
+              crossAxisSpacing: 8.w,
+              childAspectRatio: 1.58,
+            ),
+            itemBuilder: (context, index) => InkEntrance(
+              delay: Duration(milliseconds: 30 * index),
+              offset: 6,
+              child: _ProfileServiceTile(item: items[index]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileServiceTile extends StatelessWidget {
+  const _ProfileServiceTile({required this.item});
+
+  final _ProfileServiceItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkPressable(
+      onTap: item.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: item.color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(15.r),
+          border: Border.all(color: item.color.withValues(alpha: 0.12)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(item.icon, color: item.color, size: 18.w),
+            const Spacer(),
+            Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.text,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(height: 2.h),
+            Text(
+              item.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: InkPalette.muted,
+                fontSize: 9.8.sp,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileServiceItem {
+  const _ProfileServiceItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+}
+
 class _ProfileContentPadding extends StatelessWidget {
   const _ProfileContentPadding({
     required this.child,
-    this.top = 12,
+    this.top = 9,
     this.motionIndex = 0,
   });
 
@@ -2013,8 +2221,8 @@ class _ProfileAvatar extends StatelessWidget {
     final provider = _avatarProvider(avatarUrl);
 
     return Container(
-      width: 68.w,
-      height: 68.w,
+      width: 56.w,
+      height: 56.w,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const LinearGradient(
@@ -2027,14 +2235,14 @@ class _ProfileAvatar extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: InkPalette.lake.withValues(alpha: 0.10),
-            blurRadius: 18,
-            offset: Offset(0, 9.h),
+            blurRadius: 14,
+            offset: Offset(0, 7.h),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
       child: provider == null
-          ? Icon(Icons.person_rounded, color: InkPalette.pine, size: 36.w)
+          ? Icon(Icons.person_rounded, color: InkPalette.pine, size: 30.w)
           : Image(image: provider, fit: BoxFit.cover),
     );
   }
@@ -2050,7 +2258,7 @@ class _ProfileTag extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(maxWidth: 110.w),
-      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 5.h),
+      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 4.h),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(999),
@@ -2120,7 +2328,7 @@ class _HeaderMetric extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: InkPalette.muted,
-              fontSize: 10.8.sp,
+              fontSize: 10.2.sp,
               fontWeight: FontWeight.w800,
             ),
           ),

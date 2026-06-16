@@ -10,10 +10,39 @@ import '../data/mall_models.dart';
 import 'widgets/mall_home_widgets.dart';
 
 class MallScreen extends StatefulWidget {
-  const MallScreen({super.key});
+  const MallScreen({
+    super.key,
+    this.initialIntent,
+    this.initialQuery,
+    this.initialFish,
+    this.initialMethod,
+    this.initialWindow,
+    this.entry,
+  });
+
+  final String? initialIntent;
+  final String? initialQuery;
+  final String? initialFish;
+  final String? initialMethod;
+  final String? initialWindow;
+  final String? entry;
 
   @override
   State<MallScreen> createState() => _MallScreenState();
+}
+
+String _routeContextKeyFor(MallScreen widget) {
+  return [
+        widget.entry,
+        widget.initialIntent,
+        widget.initialQuery,
+        widget.initialFish,
+        widget.initialMethod,
+        widget.initialWindow,
+      ]
+      .where((value) => value != null && value.trim().isNotEmpty)
+      .map((value) => value!.trim())
+      .join('|');
 }
 
 class _MallScreenState extends State<MallScreen> {
@@ -31,8 +60,49 @@ class _MallScreenState extends State<MallScreen> {
 
   final Map<String, int> _cart = {};
   final Set<String> _favoriteProducts = {};
+  String? _appliedRouteContextKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyRouteContext();
+  }
+
+  @override
+  void didUpdateWidget(covariant MallScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_routeContextKeyFor(widget) != _routeContextKeyFor(oldWidget)) {
+      setState(_applyRouteContext);
+    }
+  }
 
   _MallCategory get _activeCategory => _categories[_selectedCategory];
+
+  bool get _hasRouteContext => _routeContextKeyFor(widget).isNotEmpty;
+
+  void _applyRouteContext() {
+    final key = _routeContextKeyFor(widget);
+    if (key.isEmpty || key == _appliedRouteContextKey) return;
+    _appliedRouteContextKey = key;
+
+    final query = widget.initialQuery?.trim();
+    if (query != null && query.isNotEmpty) {
+      _searchQuery = query;
+    }
+
+    if (widget.initialIntent == 'device') {
+      _selectCategoryById('accessory');
+    } else if (widget.initialIntent == 'booking') {
+      _selectCategoryById('fishing_venue');
+    }
+  }
+
+  void _selectCategoryById(String categoryId) {
+    final index = _categories.indexWhere(
+      (category) => category.id == categoryId,
+    );
+    if (index >= 0) _selectedCategory = index;
+  }
 
   int get _cartCount {
     var total = 0;
@@ -53,7 +123,13 @@ class _MallScreenState extends State<MallScreen> {
           product.description.toLowerCase().contains(query) ||
           product.scene.toLowerCase().contains(query) ||
           product.tags.any((tag) => tag.toLowerCase().contains(query)) ||
+          product.suitableFish.any(
+            (fish) => fish.toLowerCase().contains(query),
+          ) ||
           product.features.any(
+            (feature) => feature.toLowerCase().contains(query),
+          ) ||
+          product.appFunctions.any(
             (feature) => feature.toLowerCase().contains(query),
           ) ||
           product.recommendedFor.any(
@@ -259,8 +335,8 @@ class _MallScreenState extends State<MallScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             InkTopBar(
-              title: '智能装备商城',
-              subtitle: '设备生态 · 场景方案 · 会员权益',
+              title: '出钓补给',
+              subtitle: '先看今天缺什么',
               onBack: () => context.pop(),
               actions: [
                 InkRoundButton(
@@ -270,6 +346,18 @@ class _MallScreenState extends State<MallScreen> {
                 ),
               ],
             ),
+            if (_hasRouteContext)
+              Padding(
+                padding: EdgeInsets.fromLTRB(18.w, 8.h, 18.w, 0),
+                child: _MallRouteContextCard(
+                  fish: widget.initialFish,
+                  method: widget.initialMethod,
+                  window: widget.initialWindow,
+                  query: _searchQuery,
+                  intent: widget.initialIntent,
+                  onTap: _addGearCombo,
+                ),
+              ),
             MallHome(
               searchText: _searchQuery,
               cartCount: _cartCount,
@@ -288,6 +376,7 @@ class _MallScreenState extends State<MallScreen> {
               checkoutSummary: _buildCheckoutSummary(),
               serviceSummary: _buildServiceSummary(),
               onSearchTap: _showMallSearchSheet,
+              onQuickSearch: _applySearch,
               onCartTap: _openMallCartPage,
               onCategoryTap: _selectMallCategory,
               onBannerTap: _showGearComboSheet,
@@ -925,6 +1014,46 @@ class _MallScreenState extends State<MallScreen> {
           onTap: () => AppFeedback.showMessage(context, '已打开退换规则'),
         ),
       ],
+    );
+  }
+}
+
+class _MallRouteContextCard extends StatelessWidget {
+  const _MallRouteContextCard({
+    required this.fish,
+    required this.method,
+    required this.window,
+    required this.query,
+    required this.intent,
+    required this.onTap,
+  });
+
+  final String? fish;
+  final String? method;
+  final String? window;
+  final String query;
+  final String? intent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fishText = fish?.trim().isNotEmpty == true ? fish!.trim() : '当前鱼情';
+    final methodText = method?.trim().isNotEmpty == true
+        ? method!.trim()
+        : '装备方案';
+    final windowText = window?.trim().isNotEmpty == true
+        ? window!.trim()
+        : '今日窗口';
+    final intentText = intent == 'device' ? '设备配件' : 'AI 装备方案';
+    final queryText = query.trim().isEmpty ? fishText : query.trim();
+
+    return InkRouteContextBanner(
+      icon: Icons.inventory_2_rounded,
+      title: '首页推荐已带入 · $intentText',
+      subtitle: '$fishText · $methodText · $windowText · 搜索 $queryText',
+      trailing: '加购',
+      color: InkPalette.reed,
+      onTap: onTap,
     );
   }
 }

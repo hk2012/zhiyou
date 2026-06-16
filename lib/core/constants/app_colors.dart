@@ -91,25 +91,25 @@ extension AppToneColorsX on AppTone {
 class AppColors {
   AppColors._();
 
-  static const Color brand = Color(0xFF0F766E);
-  static const Color brandPressed = Color(0xFF0B5F59);
-  static const Color brandSoft = Color(0xFFE6F5F3);
-  static const Color brandBorder = Color(0xFF9FD8D2);
+  static const Color brand = Color(0xFF0E6F68);
+  static const Color brandPressed = Color(0xFF0A5752);
+  static const Color brandSoft = Color(0xFFE4F4F0);
+  static const Color brandBorder = Color(0xFF9BCFC8);
 
-  static const Color info = Color(0xFF2563EB);
-  static const Color infoPressed = Color(0xFF1D4ED8);
-  static const Color infoSoft = Color(0xFFEAF1FF);
-  static const Color infoBorder = Color(0xFFB8CCFF);
+  static const Color info = Color(0xFF1F7AA8);
+  static const Color infoPressed = Color(0xFF176587);
+  static const Color infoSoft = Color(0xFFE7F4F8);
+  static const Color infoBorder = Color(0xFFA9D7E6);
 
-  static const Color commerce = Color(0xFFF59E0B);
-  static const Color commercePressed = Color(0xFFD97706);
-  static const Color commerceSoft = Color(0xFFFFF4D8);
-  static const Color commerceBorder = Color(0xFFFAD38A);
+  static const Color commerce = Color(0xFFD9902F);
+  static const Color commercePressed = Color(0xFFB8731E);
+  static const Color commerceSoft = Color(0xFFFFF3D9);
+  static const Color commerceBorder = Color(0xFFEBC986);
 
-  static const Color success = Color(0xFF16A34A);
-  static const Color successPressed = Color(0xFF15803D);
-  static const Color successSoft = Color(0xFFE8F7ED);
-  static const Color successBorder = Color(0xFFB7E5C5);
+  static const Color success = Color(0xFF3F8F5A);
+  static const Color successPressed = Color(0xFF2F7448);
+  static const Color successSoft = Color(0xFFEAF5EC);
+  static const Color successBorder = Color(0xFFB8DDBF);
 
   static const Color warning = Color(0xFFF97316);
   static const Color warningPressed = Color(0xFFEA580C);
@@ -121,17 +121,17 @@ class AppColors {
   static const Color dangerSoft = Color(0xFFFEEDEE);
   static const Color dangerBorder = Color(0xFFF8B8BD);
 
-  static const Color device = Color(0xFF0EA5E9);
-  static const Color devicePressed = Color(0xFF0284C7);
-  static const Color deviceSoft = Color(0xFFE5F6FE);
-  static const Color deviceBorder = Color(0xFFB6E3FA);
+  static const Color device = Color(0xFF228FB5);
+  static const Color devicePressed = Color(0xFF157492);
+  static const Color deviceSoft = Color(0xFFE4F4F7);
+  static const Color deviceBorder = Color(0xFFAED9E2);
 
-  static const Color surface = Color(0xFFF6F8FB);
+  static const Color surface = Color(0xFFF4F8F7);
   static const Color surfaceBase = Color(0xFFFFFFFF);
   static const Color surfaceRaised = Color(0xFFFFFFFF);
-  static const Color surfaceMuted = Color(0xFFF1F5F9);
-  static const Color surfaceTint = Color(0xFFEFF6FF);
-  static const Color surfacePressed = Color(0xFFE2E8F0);
+  static const Color surfaceMuted = Color(0xFFEEF5F3);
+  static const Color surfaceTint = Color(0xFFE9F4F0);
+  static const Color surfacePressed = Color(0xFFDDEAE6);
 
   static const Color textPrimary = Color(0xFF0F172A);
   static const Color textSecondary = Color(0xFF475569);
