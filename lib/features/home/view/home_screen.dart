@@ -177,7 +177,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       navigationHint:
           primaryVenue?.route.displayLabel ?? fallback.navigationHint,
       planTitle: fallback.planTitle,
-      planSubtitle: cityContext?.city.strategy ?? fallback.planSubtitle,
+      planSubtitle: cityContext?.city.strategy ?? '轻装出发',
       modeLabel: fallback.modeLabel,
       confidence: fallback.confidence,
       dataSource: cityContext == null
@@ -399,8 +399,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     InkSectionHeader(
-                      title: '功能中心',
-                      subtitle: '常用功能都在首屏露出',
+                      title: '功能',
+                      subtitle: '常用入口',
                       action: '全部',
                       onAction: () => _showHomeMoreSheet(
                         context,
@@ -417,7 +417,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           _HomeFunctionAction(
                             icon: Icons.place_rounded,
                             title: '找钓点',
-                            subtitle: '路线/预约',
+                            subtitle: '路线 / 预约',
                             color: InkPalette.lake,
                             onTap: () => context.go(
                               _exploreRoute(scenario, intent: 'spot'),
@@ -434,14 +434,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           _HomeFunctionAction(
                             icon: Icons.inventory_2_rounded,
                             title: '装备',
-                            subtitle: '出发清单',
+                            subtitle: '清单',
                             color: InkPalette.reed,
                             onTap: () => _showGearSheet(context, scenario),
                           ),
                           _HomeFunctionAction(
                             icon: Icons.sensors_rounded,
                             title: '设备',
-                            subtitle: '同步/校准',
+                            subtitle: '同步',
                             color: InkPalette.pine,
                             onTap: () =>
                                 _showDeviceSyncSheet(context, scenario),
@@ -449,14 +449,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           _HomeFunctionAction(
                             icon: Icons.shopping_bag_rounded,
                             title: '补给',
-                            subtitle: '按场景买',
+                            subtitle: '按场景',
                             color: InkPalette.moss,
                             onTap: () => context.go(AppRouteNames.mall),
                           ),
                           _HomeFunctionAction(
                             icon: Icons.set_meal_rounded,
-                            title: '鱼获',
-                            subtitle: '快速记录',
+                            title: '记录',
+                            subtitle: '鱼获',
                             color: InkPalette.lake,
                             onTap: () => context.push(_creationRoute(scenario)),
                           ),
@@ -464,8 +464,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     InkSectionHeader(
-                      title: '当前主线',
-                      subtitle: '从推荐到行动',
+                      title: '主线',
+                      subtitle: '推荐到行动',
                       action: '详情',
                       onAction: () => _showPlanSheet(context, scenario),
                     ),
@@ -481,8 +481,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     InkSectionHeader(
-                      title: '推荐钓点',
-                      subtitle: '先看最合适的一个',
+                      title: '钓点',
+                      subtitle: '先看一个',
                       action: '更多',
                       onAction: () =>
                           context.go(_exploreRoute(scenario, intent: 'spot')),
@@ -495,8 +495,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     InkSectionHeader(
-                      title: '今日计划',
-                      subtitle: '照着做，少走弯路',
+                      title: '计划',
+                      subtitle: '照着做',
                       action: '现场修正',
                       onAction: () => _showFieldTuneSheet(context, scenario),
                     ),
@@ -509,8 +509,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     InkSectionHeader(
-                      title: '设备状态',
-                      subtitle: '只提醒需要处理的事',
+                      title: '设备',
+                      subtitle: '只看异常',
                       action: '同步',
                       onAction: () => _showDeviceSyncSheet(context, scenario),
                     ),
@@ -617,7 +617,7 @@ void _showHomeMoreSheet(
   showInkActionSheet(
     context,
     title: '更多工具',
-    subtitle: '解释、补给、鱼获和场景切换都放在这里',
+    subtitle: '解释、补给、鱼获和切换都在这里',
     icon: Icons.dashboard_customize_rounded,
     color: scenario.accent,
     showLandscape: true,
@@ -864,51 +864,37 @@ class _HomeFunctionDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final firstRow = actions.take(3).toList(growable: false);
-    final secondRow = actions.skip(3).take(3).toList(growable: false);
     return InkGlassCard(
       padding: EdgeInsets.all(10.r),
-      child: Column(
-        children: [
-          _HomeFunctionRow(actions: firstRow, accent: accent, primaryIndex: 1),
-          SizedBox(height: 8.h),
-          _HomeFunctionRow(actions: secondRow, accent: accent),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeFunctionRow extends StatelessWidget {
-  const _HomeFunctionRow({
-    required this.actions,
-    required this.accent,
-    this.primaryIndex = -1,
-  });
-
-  final List<_HomeFunctionAction> actions;
-  final Color accent;
-  final int primaryIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          Expanded(
-            child: InkEntrance(
-              delay: Duration(milliseconds: 35 * i),
-              offset: 8,
-              child: _HomeFunctionTile(
-                action: actions[i],
-                isPrimary: i == primaryIndex,
-                accent: accent,
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 560;
+          final columns = narrow ? 2 : 3;
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: actions.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              mainAxisSpacing: 8.h,
+              crossAxisSpacing: 8.w,
+              childAspectRatio: narrow ? 1.34 : 1.78,
             ),
-          ),
-          if (i != actions.length - 1) SizedBox(width: 8.w),
-        ],
-      ],
+            itemBuilder: (context, index) {
+              final action = actions[index];
+              return InkEntrance(
+                delay: Duration(milliseconds: 35 * index),
+                offset: 8,
+                child: _HomeFunctionTile(
+                  action: action,
+                  isPrimary: index == 1,
+                  accent: accent,
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -931,7 +917,7 @@ class _HomeFunctionTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        height: 72.h,
+        constraints: BoxConstraints(minHeight: 70.h),
         padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: isPrimary
@@ -1018,8 +1004,8 @@ class _HomeMorePreview extends StatelessWidget {
       ),
       _HomePreviewItem(
         icon: Icons.photo_camera_rounded,
-        title: '钓友鱼获',
-        subtitle: '看真实收获和同水域反馈',
+        title: '鱼获',
+        subtitle: '真实反馈',
         color: InkPalette.moss,
       ),
     ];
@@ -1043,7 +1029,7 @@ class _HomeMorePreview extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '更多功能',
+                      '更多',
                       style: TextStyle(
                         color: InkPalette.text,
                         fontSize: 15.sp,
@@ -1052,7 +1038,7 @@ class _HomeMorePreview extends StatelessWidget {
                     ),
                     SizedBox(height: 2.h),
                     Text(
-                      '依据、打法、补给和钓友反馈',
+                      '依据 / 打法 / 补给 / 反馈',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1113,7 +1099,7 @@ class _HomePreviewRow extends StatelessWidget {
     return InkPressable(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 9.h),
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: item.color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(15.r),
@@ -7490,7 +7476,7 @@ const _mockScenarios = [
     primaryAction: '导航到钓点',
     navigationHint: '3.2km · 18分钟',
     planTitle: '三步打法',
-    planSubtitle: '照着做，少走弯路',
+    planSubtitle: '照着做',
     modeLabel: '新手模式',
     confidence: '86%',
     dataSource: '天气 + 水情 + 近7天鱼获',
@@ -7618,7 +7604,7 @@ const _mockScenarios = [
     primaryAction: '改晚口路线',
     navigationHint: '先收藏，晚点去',
     planTitle: '低分替代方案',
-    planSubtitle: '不硬上，改窗口',
+    planSubtitle: '改窗口',
     modeLabel: '避坑模式',
     confidence: '79%',
     dataSource: '天气 + 人流 + 历史空军率',
@@ -7746,7 +7732,7 @@ const _mockScenarios = [
     primaryAction: '看安全路线',
     navigationHint: '2.1km · 绕开湿岸',
     planTitle: '雨后短打策略',
-    planSubtitle: '有机会，但先看安全',
+    planSubtitle: '先看安全',
     modeLabel: '稳妥模式',
     confidence: '82%',
     dataSource: '降雨 + 水位 + 结构点',
@@ -7874,7 +7860,7 @@ const _mockScenarios = [
     primaryAction: '约伴导航',
     navigationHint: '4.1km · 有路灯',
     planTitle: '夜钓安全打法',
-    planSubtitle: '先安全，再追口',
+    planSubtitle: '先安全',
     modeLabel: '夜钓模式',
     confidence: '80%',
     dataSource: '夜间鱼获 + 灯光点 + 安全标签',

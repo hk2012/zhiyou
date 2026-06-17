@@ -99,8 +99,8 @@ class MallHome extends StatelessWidget {
           ),
         if (!hasSearch)
           _MallSolutionGuideSection(
-            title: '常见需求',
-            subtitle: '按问题直接找补给',
+            title: '需求',
+            subtitle: '按问题找',
             entries: [
               ..._sceneSolutionEntries.take(2),
               ..._problemSolutionEntries.take(2),
@@ -343,7 +343,7 @@ class _MallShoppingModeStrip extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '补给方式',
+                        '补给',
                         style: TextStyle(
                           color: InkPalette.text,
                           fontSize: 15.sp,
@@ -352,7 +352,7 @@ class _MallShoppingModeStrip extends StatelessWidget {
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        '按场景、问题、设备或会员权益快速进入',
+                        '场景 / 问题 / 设备 / 权益',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -367,19 +367,26 @@ class _MallShoppingModeStrip extends StatelessWidget {
               ],
             ),
             SizedBox(height: 10.h),
-            Row(
-              children: [
-                for (var i = 0; i < items.length; i++) ...[
-                  Expanded(
-                    child: InkEntrance(
-                      delay: Duration(milliseconds: 35 * i),
-                      offset: 6,
-                      child: _MallModeTile(item: items[i]),
-                    ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth < 520 ? 2 : 4;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    mainAxisSpacing: 8.h,
+                    crossAxisSpacing: 8.w,
+                    childAspectRatio: constraints.maxWidth < 520 ? 1.24 : 1.36,
                   ),
-                  if (i != items.length - 1) SizedBox(width: 8.w),
-                ],
-              ],
+                  itemBuilder: (context, index) => InkEntrance(
+                    delay: Duration(milliseconds: 35 * index),
+                    offset: 6,
+                    child: _MallModeTile(item: items[index]),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -400,7 +407,7 @@ class _MallModeTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        constraints: BoxConstraints(minHeight: 76.h),
+        constraints: BoxConstraints(minHeight: 72.h),
         padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: item.color.withValues(alpha: 0.07),

@@ -229,8 +229,8 @@ class ProfileScreen extends ConsumerWidget {
 void _showProfileMoreSheet(BuildContext context, ProfileMemberState member) {
   showInkActionSheet(
     context,
-    title: '更多资产与服务',
-    subtitle: '订单、预约、钱包和售后集中放在这里',
+    title: '更多',
+    subtitle: '订单 / 预约 / 钱包 / 售后',
     icon: Icons.account_balance_wallet_rounded,
     color: InkPalette.lake,
     actions: [
@@ -1983,7 +1983,7 @@ class _ProfileServiceDock extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '资产与服务',
+                      '资产',
                       style: TextStyle(
                         color: InkPalette.text,
                         fontSize: 15.sp,
@@ -1992,7 +1992,7 @@ class _ProfileServiceDock extends StatelessWidget {
                     ),
                     SizedBox(height: 2.h),
                     Text(
-                      '会员、订单、预约、钱包和售后',
+                      '会员 / 订单 / 预约 / 钱包 / 售后',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -2018,21 +2018,26 @@ class _ProfileServiceDock extends StatelessWidget {
             ],
           ),
           SizedBox(height: 10.h),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 8.h,
-              crossAxisSpacing: 8.w,
-              childAspectRatio: 1.58,
-            ),
-            itemBuilder: (context, index) => InkEntrance(
-              delay: Duration(milliseconds: 30 * index),
-              offset: 6,
-              child: _ProfileServiceTile(item: items[index]),
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth < 520 ? 2 : 3;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 8.h,
+                  crossAxisSpacing: 8.w,
+                  childAspectRatio: constraints.maxWidth < 520 ? 1.34 : 1.58,
+                ),
+                itemBuilder: (context, index) => InkEntrance(
+                  delay: Duration(milliseconds: 30 * index),
+                  offset: 6,
+                  child: _ProfileServiceTile(item: items[index]),
+                ),
+              );
+            },
           ),
         ],
       ),

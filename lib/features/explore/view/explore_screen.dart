@@ -407,8 +407,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
 void _showExploreMoreSheet(BuildContext context, FishingVenue featured) {
   showInkActionSheet(
     context,
-    title: '钓点服务',
-    subtitle: '地图、活动、设备和补给放在这里',
+    title: '服务',
+    subtitle: '地图 / 活动 / 设备 / 补给',
     icon: Icons.layers_rounded,
     color: InkPalette.lake,
     showLandscape: true,
@@ -458,28 +458,28 @@ class _ExploreServiceDock extends StatelessWidget {
       _ExploreServiceItem(
         icon: Icons.map_rounded,
         title: '地图',
-        subtitle: venue.navigationHint,
+        subtitle: '路线',
         color: InkPalette.lake,
         onTap: onOpenServices,
       ),
       _ExploreServiceItem(
         icon: Icons.event_available_rounded,
         title: '预约',
-        subtitle: venue.bookingSupported ? '可订钓位' : '查看规则',
+        subtitle: venue.bookingSupported ? '可预约' : '看规则',
         color: InkPalette.pine,
         onTap: onBook,
       ),
       _ExploreServiceItem(
         icon: Icons.sensors_rounded,
         title: '鱼情',
-        subtitle: '设备联动',
+        subtitle: '看设备',
         color: InkPalette.moss,
         onTap: onOpenServices,
       ),
       _ExploreServiceItem(
         icon: Icons.shopping_bag_rounded,
         title: '补给',
-        subtitle: '按钓点配',
+        subtitle: '按钓点',
         color: InkPalette.reed,
         onTap: onMall,
       ),
@@ -505,7 +505,7 @@ class _ExploreServiceDock extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '钓点服务',
+                      '服务',
                       style: TextStyle(
                         color: InkPalette.text,
                         fontSize: 15.sp,
@@ -514,7 +514,7 @@ class _ExploreServiceDock extends StatelessWidget {
                     ),
                     SizedBox(height: 2.h),
                     Text(
-                      '地图、预约、设备鱼情和补给',
+                      '地图 / 预约 / 鱼情 / 补给',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -540,19 +540,26 @@ class _ExploreServiceDock extends StatelessWidget {
             ],
           ),
           SizedBox(height: 9.h),
-          Row(
-            children: [
-              for (var i = 0; i < items.length; i++) ...[
-                Expanded(
-                  child: InkEntrance(
-                    delay: Duration(milliseconds: 35 * i),
-                    offset: 6,
-                    child: _ExploreServiceTile(item: items[i]),
-                  ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth < 520 ? 2 : 4;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 8.h,
+                  crossAxisSpacing: 8.w,
+                  childAspectRatio: constraints.maxWidth < 520 ? 1.28 : 1.38,
                 ),
-                if (i != items.length - 1) SizedBox(width: 8.w),
-              ],
-            ],
+                itemBuilder: (context, index) => InkEntrance(
+                  delay: Duration(milliseconds: 35 * index),
+                  offset: 6,
+                  child: _ExploreServiceTile(item: items[index]),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -572,7 +579,7 @@ class _ExploreServiceTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        constraints: BoxConstraints(minHeight: 76.h),
+        constraints: BoxConstraints(minHeight: 72.h),
         padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: item.color.withValues(alpha: 0.07),

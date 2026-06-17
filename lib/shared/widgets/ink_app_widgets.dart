@@ -658,7 +658,7 @@ class InkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = Container(
       margin: margin,
-      padding: padding ?? EdgeInsets.all(14.r),
+      padding: padding ?? EdgeInsets.all(12.r),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: color ?? InkPalette.white.withValues(alpha: 0.96),
@@ -724,9 +724,9 @@ class InkSectionHeader extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.page.w,
-        14.h,
+        10.h,
         AppSpacing.page.w,
-        5.h,
+        3.h,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -739,19 +739,19 @@ class InkSectionHeader extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color: InkPalette.text,
-                    fontSize: 17.sp,
+                    fontSize: 15.5.sp,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
                     fontFamilyFallback: inkFontFallback,
                   ),
                 ),
-                SizedBox(height: 2.h),
+                SizedBox(height: 1.h),
                 if (subtitle != null)
                   Text(
                     subtitle!,
                     style: TextStyle(
                       color: InkPalette.muted,
-                      fontSize: 11.5.sp,
+                      fontSize: 10.2.sp,
                       fontWeight: FontWeight.w900,
                       fontFamilyFallback: inkFontFallback,
                     ),
@@ -764,8 +764,8 @@ class InkSectionHeader extends StatelessWidget {
               onTap: onAction,
               behavior: HitTestBehavior.opaque,
               child: Container(
-                constraints: BoxConstraints(minHeight: 34.h),
-                padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 5.h),
+                constraints: BoxConstraints(minHeight: 30.h),
+                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
                 alignment: Alignment.center,
                 child: Row(
                   children: [
@@ -773,7 +773,7 @@ class InkSectionHeader extends StatelessWidget {
                       action!,
                       style: TextStyle(
                         color: InkPalette.pine,
-                        fontSize: 12.sp,
+                        fontSize: 11.sp,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
