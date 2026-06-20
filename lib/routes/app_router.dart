@@ -85,8 +85,20 @@ class AppRouter {
             routes: [
               GoRoute(
                 path: AppRouteNames.explore,
-                pageBuilder: (context, state) =>
-                    _inkPage(state, const ExploreScreen()),
+                pageBuilder: (context, state) {
+                  final params = state.uri.queryParameters;
+                  return _inkPage(
+                    state,
+                    ExploreScreen(
+                      initialSpot: params['spot'],
+                      initialFish: params['fish'],
+                      initialWindow: params['window'],
+                      initialHint: params['hint'],
+                      initialIntent: params['intent'],
+                      entry: params['entry'],
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -94,8 +106,20 @@ class AppRouter {
             routes: [
               GoRoute(
                 path: AppRouteNames.mall,
-                pageBuilder: (context, state) =>
-                    _inkPage(state, const MallScreen()),
+                pageBuilder: (context, state) {
+                  final params = state.uri.queryParameters;
+                  return _inkPage(
+                    state,
+                    MallScreen(
+                      initialIntent: params['intent'],
+                      initialQuery: params['query'] ?? params['fish'],
+                      initialFish: params['fish'],
+                      initialMethod: params['method'],
+                      initialWindow: params['window'],
+                      entry: params['entry'],
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -147,8 +171,18 @@ class AppRouter {
         name: 'CreationModal',
         parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) {
-          final spotName = state.uri.queryParameters['spot'];
-          return _modalPage(state, CreationModalScreen(initialSpot: spotName));
+          final params = state.uri.queryParameters;
+          return _modalPage(
+            state,
+            CreationModalScreen(
+              initialSpot: params['spot'],
+              initialFish: params['fish'],
+              initialMethod: params['method'],
+              initialWindow: params['window'],
+              initialHint: params['hint'],
+              entry: params['entry'],
+            ),
+          );
         },
       ),
       GoRoute(

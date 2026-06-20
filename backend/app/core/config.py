@@ -45,6 +45,22 @@ class Settings(BaseSettings):
         default="gpt-5-mini",
         description="AI 垂钓分析使用的 OpenAI 模型，可用 OPENAI_MODEL 覆盖。",
     )
+    amap_web_service_key: Optional[str] = Field(
+        default=None,
+        description="高德 WebService Key，仅放在环境变量 AMAP_WEB_SERVICE_KEY。",
+    )
+    qweather_api_key: Optional[str] = Field(
+        default=None,
+        description="和风天气旧版 Key，可用 QWEATHER_API_KEY 覆盖。",
+    )
+    qweather_api_token: Optional[str] = Field(
+        default=None,
+        description="和风天气 JWT Token，可用 QWEATHER_API_TOKEN 覆盖。",
+    )
+    qweather_api_host: str = Field(
+        default="https://devapi.qweather.com",
+        description="和风天气 API Host，可用 QWEATHER_API_HOST 覆盖。",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

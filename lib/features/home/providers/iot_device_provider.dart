@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/domain/app_domain_models.dart';
 import '../../../core/network/dio_client.dart';
-import '../data/device_models.dart';
+import '../data/device_mock_data.dart';
 import '../data/device_repository.dart';
 
 enum IotDeviceSource { localMock, api }
@@ -199,7 +199,7 @@ class IotDeviceSummary {
 class IotDevicesNotifier extends Notifier<List<IotDeviceState>> {
   @override
   List<IotDeviceState> build() {
-    return _mockIotDevices;
+    return _fallbackIotDevices;
   }
 
   Future<bool> refreshFromApi({bool silent = false}) async {
@@ -210,18 +210,18 @@ class IotDevicesNotifier extends Notifier<List<IotDeviceState>> {
     try {
       final result = await ref.read(deviceRepositoryProvider).fetchDevices();
       if (result.devices.isEmpty) {
-        state = _mockIotDevices;
+        state = _fallbackIotDevices;
         ref
             .read(iotDeviceLoadStateProvider.notifier)
             .markFallback('后端暂无绑定设备，已展示本地设备快照');
         return false;
       }
 
-      state = result.devices.map(_mapApiDevice).toList(growable: false);
+      state = result.devices.map(_mapDomainDevice).toList(growable: false);
       ref.read(iotDeviceLoadStateProvider.notifier).markApi();
       return true;
     } catch (error) {
-      state = _mockIotDevices;
+      state = _fallbackIotDevices;
       ref
           .read(iotDeviceLoadStateProvider.notifier)
           .markFallback(_friendlyError(error));
@@ -278,80 +278,11 @@ class IotDevicesNotifier extends Notifier<List<IotDeviceState>> {
   }
 }
 
-const _mockIotDevices = [
-  IotDeviceState(
-    id: 'float_fc_01',
-    title: '智能鱼漂 FC-01',
-    type: 'float',
-    sceneRole: '鱼口捕捉',
-    telemetryLabel: '咬口频率',
-    telemetryValue: '6次/20分',
-    workingState: '高灵敏监测',
-    batteryLevel: 78,
-    signalLevel: 91,
-    isActive: true,
-    riskLabel: '正常',
-    actionHint: '轻口明显，建议保留小饵和慢节奏。',
-  ),
-  IotDeviceState(
-    id: 'sonar_dp_02',
-    title: '便携探鱼器 DP-02',
-    type: 'sonar',
-    sceneRole: '鱼层扫描',
-    telemetryLabel: '鱼层',
-    telemetryValue: '1.8-2.4m',
-    workingState: '扇面扫描中',
-    batteryLevel: 64,
-    signalLevel: 84,
-    isActive: true,
-    riskLabel: '可用',
-    actionHint: '中上层有信号，20 分钟无口就换层。',
-  ),
-  IotDeviceState(
-    id: 'box_cool_01',
-    title: '智能钓箱 BOX-01',
-    type: 'box',
-    sceneRole: '鱼获保鲜',
-    telemetryLabel: '箱内温度',
-    telemetryValue: '4°C',
-    workingState: '恒温保鲜',
-    batteryLevel: 89,
-    signalLevel: 76,
-    isActive: true,
-    riskLabel: '正常',
-    actionHint: '鱼获记录后自动关联保鲜时长。',
-  ),
-  IotDeviceState(
-    id: 'umbrella_sun_01',
-    title: '智能钓伞 U-01',
-    type: 'umbrella',
-    sceneRole: '体感防护',
-    telemetryLabel: '紫外线',
-    telemetryValue: '中等',
-    workingState: '遮阳联动',
-    batteryLevel: 72,
-    signalLevel: 68,
-    isActive: true,
-    riskLabel: '提醒',
-    actionHint: '午后风变大时自动提示收伞。',
-  ),
-  IotDeviceState(
-    id: 'platform_lock_01',
-    title: '智能钓台 P-01',
-    type: 'platform',
-    sceneRole: '岸边安全',
-    telemetryLabel: '水平状态',
-    telemetryValue: '偏移 2°',
-    workingState: '待机锁定',
-    batteryLevel: 96,
-    signalLevel: 42,
-    isActive: false,
-    riskLabel: '待校准',
-    actionHint: '到达钓位后先校准水平和锁定状态。',
-  ),
-];
+List<IotDeviceState> get _fallbackIotDevices {
+  return mockFallbackDevices.map(_mapDomainDevice).toList(growable: false);
+}
 
-IotDeviceState _mapApiDevice(Device device) {
+IotDeviceState _mapDomainDevice(DomainDevice device) {
   final telemetry = device.telemetry.isNotEmpty ? device.telemetry.first : null;
   final type = _legacyDeviceType(device.type);
   final riskLabel = _riskLabelFromDevice(device);
@@ -374,54 +305,57 @@ IotDeviceState _mapApiDevice(Device device) {
   );
 }
 
-String _legacyDeviceType(String type) {
+String _legacyDeviceType(DomainDeviceType type) {
   return switch (type) {
-    'smart_float' || 'float' => 'float',
-    'smart_tackle_box' || 'tackle_box' || 'box' => 'box',
-    'smart_platform' || 'platform' => 'platform',
-    'smart_umbrella' || 'umbrella' => 'umbrella',
-    'fish_finder' || 'sonar' => 'sonar',
-    _ => type,
+    DomainDeviceType.smartFloat => 'float',
+    DomainDeviceType.smartTackleBox => 'box',
+    DomainDeviceType.smartPlatform => 'platform',
+    DomainDeviceType.smartUmbrella => 'umbrella',
+    DomainDeviceType.fishFinder => 'sonar',
+    _ => type.wireValue,
   };
 }
 
-bool _isActiveStatus(String status) {
-  return status == 'online' || status == 'active' || status == 'running';
+bool _isActiveStatus(DomainDeviceStatus status) {
+  return status == DomainDeviceStatus.online;
 }
 
-String _workingStateFromDevice(Device device, String type) {
+String _workingStateFromDevice(DomainDevice device, String type) {
   return switch (device.status) {
-    'online' => _activeStateLabel(type),
-    'standby' => '待机锁定',
-    'abnormal' => '需要处理',
-    'offline' => '离线',
-    'unbound' => '未绑定',
-    _ => '在线监测',
+    DomainDeviceStatus.online => _activeStateLabel(type),
+    DomainDeviceStatus.standby => '待机锁定',
+    DomainDeviceStatus.abnormal => '需要处理',
+    DomainDeviceStatus.offline => '离线',
+    DomainDeviceStatus.unbound => '未绑定',
   };
 }
 
-String _riskLabelFromDevice(Device device) {
+String _riskLabelFromDevice(DomainDevice device) {
   final unresolvedAlerts = device.alerts.where((alert) => !alert.resolved);
   final critical = unresolvedAlerts.where(
-    (alert) => alert.severity == 'critical',
+    (alert) => alert.severity == DomainAlertSeverity.critical,
   );
   final warning = unresolvedAlerts.where(
-    (alert) => alert.severity == 'warning',
+    (alert) => alert.severity == DomainAlertSeverity.warning,
   );
 
   if (critical.isNotEmpty) return '异常';
-  if (device.status == 'offline') return '离线';
-  if (device.status == 'unbound') return '未绑定';
-  if (device.status == 'abnormal') return '异常';
+  if (device.status == DomainDeviceStatus.offline) return '离线';
+  if (device.status == DomainDeviceStatus.unbound) return '未绑定';
+  if (device.status == DomainDeviceStatus.abnormal) return '异常';
   if (device.batteryLevel > 0 && device.batteryLevel <= 20) return '低电量';
   if (warning.isNotEmpty) {
     return warning.first.title.isNotEmpty ? warning.first.title : '提醒';
   }
-  if (device.status == 'standby') return '待机';
+  if (device.status == DomainDeviceStatus.standby) return '待机';
   return '正常';
 }
 
-String _actionHintFromDevice(Device device, String type, String riskLabel) {
+String _actionHintFromDevice(
+  DomainDevice device,
+  String type,
+  String riskLabel,
+) {
   final actionableAlerts = device.alerts.where(
     (alert) => !alert.resolved && alert.message.isNotEmpty,
   );
@@ -494,7 +428,7 @@ final iotDeviceLoadStateProvider =
 
 final iotDeviceSummaryProvider = Provider<IotDeviceSummary>((ref) {
   final devices = ref.watch(iotDevicesProvider);
-  final safeDevices = devices.isEmpty ? _mockIotDevices : devices;
+  final safeDevices = devices.isEmpty ? _fallbackIotDevices : devices;
   final online = safeDevices.where((device) => device.isActive).length;
   final warning = safeDevices
       .where(

@@ -1,113 +1,47 @@
-class Device {
-  const Device({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.status,
-    required this.sceneRole,
-    required this.batteryLevel,
-    required this.signalLevel,
-    required this.telemetry,
-    required this.alerts,
-    this.firmwareVersion = '',
-    this.boundAt,
-    this.lastSeenAt,
-  });
+import '../../../core/domain/app_domain_models.dart';
 
-  final String id;
-  final String name;
-  final String type;
-  final String status;
-  final String sceneRole;
-  final int batteryLevel;
-  final int signalLevel;
-  final List<DeviceTelemetry> telemetry;
-  final List<DeviceAlert> alerts;
-  final String firmwareVersion;
-  final DateTime? boundAt;
-  final DateTime? lastSeenAt;
+typedef DeviceTelemetry = DomainTelemetrySnapshot;
+typedef DeviceAlert = DomainDeviceAlert;
+
+/// Compatibility API model for the devices endpoint.
+///
+/// The canonical fields live in [DomainDevice]. Keeping this thin subclass lets
+/// existing repositories keep their public type names while avoiding a second
+/// hand-written device contract.
+class Device extends DomainDevice {
+  const Device({
+    required super.id,
+    required super.name,
+    required super.type,
+    required super.status,
+    required super.sceneRole,
+    required super.batteryLevel,
+    required super.signalLevel,
+    required super.telemetry,
+    super.firmwareVersion = '',
+    super.boundAt,
+    super.lastSeenAt,
+    super.alerts = const [],
+  });
 
   factory Device.fromJson(Map<String, dynamic> json) {
+    return Device.fromDomain(DomainDevice.fromJson(json));
+  }
+
+  factory Device.fromDomain(DomainDevice device) {
     return Device(
-      id: _asString(json['id']),
-      name: _asString(json['name']),
-      type: _asString(json['type']),
-      status: _asString(json['status']),
-      sceneRole: _asString(json['scene_role']),
-      batteryLevel: _asInt(json['battery_level']),
-      signalLevel: _asInt(json['signal_level']),
-      telemetry: _asList(json['telemetry'], DeviceTelemetry.fromJson),
-      alerts: _asList(json['alerts'], DeviceAlert.fromJson),
-      firmwareVersion: _asString(json['firmware_version']),
-      boundAt: _asDateTime(json['bound_at']),
-      lastSeenAt: _asDateTime(json['last_seen_at']),
-    );
-  }
-}
-
-class DeviceTelemetry {
-  const DeviceTelemetry({
-    required this.metricKey,
-    required this.label,
-    required this.value,
-    this.unit = '',
-    this.numericValue,
-    this.quality = 'normal',
-    this.observedAt,
-  });
-
-  final String metricKey;
-  final String label;
-  final String value;
-  final String unit;
-  final double? numericValue;
-  final String quality;
-  final DateTime? observedAt;
-
-  factory DeviceTelemetry.fromJson(Map<String, dynamic> json) {
-    return DeviceTelemetry(
-      metricKey: _asString(json['metric_key']),
-      label: _asString(json['label']),
-      value: _asString(json['value']),
-      unit: _asString(json['unit']),
-      numericValue: _asDoubleOrNull(json['numeric_value']),
-      quality: _asString(json['quality'], fallback: 'normal'),
-      observedAt: _asDateTime(json['observed_at']),
-    );
-  }
-}
-
-class DeviceAlert {
-  const DeviceAlert({
-    required this.id,
-    required this.deviceId,
-    required this.severity,
-    required this.title,
-    required this.message,
-    this.actionLabel = '',
-    this.resolved = false,
-    this.createdAt,
-  });
-
-  final String id;
-  final String deviceId;
-  final String severity;
-  final String title;
-  final String message;
-  final String actionLabel;
-  final bool resolved;
-  final DateTime? createdAt;
-
-  factory DeviceAlert.fromJson(Map<String, dynamic> json) {
-    return DeviceAlert(
-      id: _asString(json['id']),
-      deviceId: _asString(json['device_id']),
-      severity: _asString(json['severity'], fallback: 'info'),
-      title: _asString(json['title']),
-      message: _asString(json['message']),
-      actionLabel: _asString(json['action_label']),
-      resolved: _asBool(json['resolved']),
-      createdAt: _asDateTime(json['created_at']),
+      id: device.id,
+      name: device.name,
+      type: device.type,
+      status: device.status,
+      sceneRole: device.sceneRole,
+      batteryLevel: device.batteryLevel,
+      signalLevel: device.signalLevel,
+      telemetry: device.telemetry,
+      firmwareVersion: device.firmwareVersion,
+      boundAt: device.boundAt,
+      lastSeenAt: device.lastSeenAt,
+      alerts: device.alerts,
     );
   }
 }
@@ -182,12 +116,6 @@ String _asString(dynamic value, {String fallback = ''}) {
   if (value == null) return fallback;
   final text = value.toString();
   return text.isEmpty ? fallback : text;
-}
-
-int _asInt(dynamic value) {
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
 double? _asDoubleOrNull(dynamic value) {

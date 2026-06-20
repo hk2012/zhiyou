@@ -402,6 +402,7 @@ def _seed_smart_devices(db: Session, user: AppUser) -> None:
         device.bound_at = datetime(2026, 6, 1, 8, 0)
         device.last_seen_at = now
         device.extra_data = row.get("extra_data", {})
+        db.flush()
 
         if not db.scalar(
             select(DeviceTelemetrySnapshot.id).where(

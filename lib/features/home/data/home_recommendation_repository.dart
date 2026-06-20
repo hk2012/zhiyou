@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import 'home_location_reader.dart';
 import 'home_recommendation_models.dart';
+import 'local_city_models.dart';
 
 final homeRecommendationRepositoryProvider =
     Provider<HomeRecommendationRepository>((ref) {
@@ -21,6 +22,48 @@ class HomeRecommendationRepository {
 
   Future<HomeLocation> resolveLocation({required bool requestPrecise}) {
     return _locationService.resolveLocation(requestPrecise: requestPrecise);
+  }
+
+  Future<List<LocalTrialCity>> fetchTrialCities() async {
+    final response = await _dio.get<List<dynamic>>(
+      '/api/v1/localization/trial-cities',
+    );
+    final data = response.data;
+    if (data == null) return const [];
+    return data
+        .map((item) => LocalTrialCity.fromJson(_asResponseMap(item)))
+        .toList();
+  }
+
+  Future<LocalCityContext> fetchCityContext({
+    required String cityCode,
+    HomeLocation? origin,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/api/v1/localization/city-context',
+      queryParameters: {
+        'city_code': cityCode,
+        if (origin?.latitude != null) 'latitude': origin!.latitude,
+        if (origin?.longitude != null) 'longitude': origin!.longitude,
+      },
+    );
+    return LocalCityContext.fromJson(response.data ?? {});
+  }
+
+  Future<VenueVerificationQueueEntry> enqueueVenueVerification({
+    required String venueId,
+    required String reason,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/localization/verification-queue',
+      data: {
+        'venue_id': venueId,
+        'reason': reason,
+        'source': 'home_venue_detail',
+        'requested_by': 'home_demo',
+      },
+    );
+    return VenueVerificationQueueEntry.fromJson(response.data ?? {});
   }
 
   Future<List<HomeCardPreference>> fetchCardPreferences() async {
@@ -55,6 +98,7 @@ class HomeRecommendationRepository {
   Future<HomeRecommendationSummary> fetchSummary({
     required List<String> enabledCardIds,
     required HomeLocation location,
+    LocalWeatherSnapshot? weatherSnapshot,
     List<HomeExpertObservation> expertObservations = const [],
     bool recalibrate = false,
   }) async {
@@ -73,13 +117,7 @@ class HomeRecommendationRepository {
           'expert_observations': [
             for (final observation in expertObservations) observation.toJson(),
           ],
-        'weather': {
-          'hour': DateTime.now().hour,
-          // 天气数据后面会接真实供应商；现在先让后端使用可解释的默认水情。
-          'condition': '多云',
-          'season': '夏季',
-          'water_clarity': '微浑',
-        },
+        'weather': weatherSnapshot?.toHomeWeatherJson() ?? _fallbackWeather(),
       },
     );
 
@@ -164,6 +202,16 @@ class HomeRecommendationRepository {
   }
 }
 
+Map<String, dynamic> _fallbackWeather() {
+  return {
+    'hour': DateTime.now().hour,
+    // 天气数据后面会接真实供应商；现在先让后端使用可解释的默认水情。
+    'condition': '多云',
+    'season': '夏季',
+    'water_clarity': '微浑',
+  };
+}
+
 Map<String, dynamic> _asResponseMap(dynamic value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) return value.map((key, value) => MapEntry('$key', value));
@@ -172,10 +220,10 @@ Map<String, dynamic> _asResponseMap(dynamic value) {
 
 class HomeLocationService {
   static const fallbackLocation = HomeLocation(
-    name: '千岛湖 · 东南湖区',
-    latitude: 29.594,
-    longitude: 119.054,
-    statusMessage: '未获取到真实定位，使用默认钓点',
+    name: '南京市 · 试点城市',
+    latitude: 32.0603,
+    longitude: 118.7969,
+    statusMessage: '未获取到真实定位，使用南京试点城市',
   );
 
   HomeLocation? _cachedDeviceLocation;
