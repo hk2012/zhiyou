@@ -467,6 +467,59 @@ class FirmwareVersion(Base):
     )
 
 
+class DeviceCommandRecord(Base):
+    """设备命令及模拟硬件回执。
+
+    command_uid 是前后端共同追踪控制操作的稳定标识；timeline 保留状态变化，
+    后续切换 MQTT 或厂商云时仍沿用相同的查询契约。
+    """
+
+    __tablename__ = "device_commands"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    command_uid: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    device_uid: Mapped[str] = mapped_column(ForeignKey("smart_devices.device_uid"), nullable=False)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("app_users.id"))
+    command: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    dangerous: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    parameters: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    result: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    timeline: Mapped[list[dict]] = mapped_column(json_type(), default=list, nullable=False)
+    failure_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class AutomationSceneRecord(Base):
+    """用户配置的多设备联动场景。"""
+
+    __tablename__ = "device_automation_scenes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scene_uid: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("app_users.id"))
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    actions: Mapped[list[dict]] = mapped_column(json_type(), default=list, nullable=False)
+    last_executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class FishingVenue(Base):
     """商业钓场统一表。
 
