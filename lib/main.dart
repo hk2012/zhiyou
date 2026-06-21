@@ -57,11 +57,9 @@ class _BrowserAdaptiveApp extends StatelessWidget {
             : designSize.height;
         final isBrowserWide = viewportWidth >= 560;
         final frameWidth = isBrowserWide
-            ? designSize.width
+            ? viewportWidth
             : viewportWidth.clamp(320.0, 430.0);
-        final frameHeight = isBrowserWide
-            ? (viewportHeight - 40).clamp(620.0, designSize.height)
-            : viewportHeight;
+        final frameHeight = viewportHeight;
         final viewData = MediaQueryData.fromView(View.of(context));
 
         final frameMediaQuery = viewData.copyWith(
@@ -73,7 +71,9 @@ class _BrowserAdaptiveApp extends StatelessWidget {
 
         ScreenUtil.configure(
           data: frameMediaQuery,
-          designSize: designSize,
+          designSize: isBrowserWide
+              ? Size(frameWidth, frameHeight)
+              : designSize,
           minTextAdapt: true,
           splitScreenMode: true,
         );
@@ -95,40 +95,7 @@ class _BrowserAdaptiveApp extends StatelessWidget {
           ),
         );
 
-        if (!isBrowserWide) {
-          return framedApp;
-        }
-
-        return DecoratedBox(
-          decoration: const BoxDecoration(
-            color: Color(0xFF0F172A),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF0B1220), Color(0xFF111827), Color(0xFF0F172A)],
-            ),
-          ),
-          child: Center(
-            child: Container(
-              width: frameWidth,
-              height: frameHeight,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6F8FB),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.36),
-                    blurRadius: 30,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: framedApp,
-            ),
-          ),
-        );
+        return framedApp;
       },
     );
   }

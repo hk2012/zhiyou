@@ -16,4 +16,16 @@ class AppRouteNames {
   static const String mallCheckout = '/mall/checkout';
   static const String mallProductDetail = '/mall/product-detail';
   static const String settings = '/settings';
+
+  static const String devices = '/devices';
+  static const String deviceDetail = '/devices/:deviceId';
+  static const String deviceAdd = '/devices/add';
+  static const String deviceScenes = '/device-scenes';
+  static const String deviceAlerts = '/device-alerts';
+  static const String deviceCommand = '/device-commands/:commandId';
+
+  static String deviceDetailPath(String deviceId) => '/devices/$deviceId';
+
+  static String deviceCommandPath(String commandId) =>
+      '/device-commands/$commandId';
 }

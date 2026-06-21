@@ -132,7 +132,7 @@ class ProfileScreen extends ConsumerWidget {
               title: '智能装备',
               subtitle: '只看当前状态',
               action: '管理',
-              onAction: () => _showDeviceServiceSheet(context, visibleDevices),
+              onAction: () => _pushProfileRoute(context, AppRouteNames.devices),
             ),
             _ProfileContentPadding(
               motionIndex: 4,
@@ -145,7 +145,7 @@ class ProfileScreen extends ConsumerWidget {
                   AppFeedback.showMessage(context, '智能装备状态已同步');
                 },
                 onManage: () =>
-                    _showDeviceServiceSheet(context, visibleDevices),
+                    _pushProfileRoute(context, AppRouteNames.devices),
               ),
             ),
             _ProfileSectionHeader(
@@ -3314,57 +3314,6 @@ void _showMembershipSheet(BuildContext context, ProfileMemberState member) {
   );
 }
 
-void _showDeviceServiceSheet(
-  BuildContext context,
-  List<IotDeviceState> devices,
-) {
-  final summary = ProfileDevicesSummary.fromDevices(devices);
-  final coreDevices = devices.where(_isCoreDevice).toList(growable: false);
-
-  showInkActionSheet(
-    context,
-    title: '我的智能装备',
-    subtitle:
-        '${summary.total} 台设备｜${summary.online} 台在线｜${summary.lowBattery} 台低电量 · 最近同步 ${summary.lastSyncAt}',
-    icon: Icons.settings_input_antenna_rounded,
-    color: InkPalette.lake,
-    children: [
-      if (coreDevices.isEmpty)
-        ProfileStateCard(
-          icon: Icons.add_link_rounded,
-          title: '还没有绑定智能装备',
-          message: '绑定智能装备，开启完整作钓体验',
-          color: InkPalette.lake,
-          primaryLabel: '立即绑定设备',
-          onPrimary: () => _goProfileRoute(context, AppRouteNames.mall),
-          secondaryLabel: '查看支持设备',
-          onSecondary: () => _goProfileRoute(context, AppRouteNames.mall),
-        )
-      else
-        for (final device in coreDevices) ...[
-          _DeviceSheetRow(device: device),
-          if (device != coreDevices.last) SizedBox(height: 8.h),
-        ],
-    ],
-    actions: [
-      InkSheetAction(
-        icon: Icons.sync_rounded,
-        title: '同步全部设备',
-        subtitle: '刷新鱼漂、钓箱、钓台、钓伞最近状态',
-        color: InkPalette.lake,
-        onTap: () => AppFeedback.showMessage(context, '已下发多设备同步任务'),
-      ),
-      InkSheetAction(
-        icon: Icons.build_circle_outlined,
-        title: '售后与固件',
-        subtitle: '校准、维修、解绑和 OTA 升级',
-        color: InkPalette.moss,
-        onTap: () => _goProfileRoute(context, AppRouteNames.mall),
-      ),
-    ],
-  );
-}
-
 void _showOrderSheet(BuildContext context, ProfileShortcutItem item) {
   showInkActionSheet(
     context,
@@ -3535,84 +3484,6 @@ bool _isUnauthorizedProfileError(Object? error) {
 bool _isProfileNetworkError(Object? error) {
   if (error == null || _isUnauthorizedProfileError(error)) return false;
   return true;
-}
-
-class _DeviceSheetRow extends StatelessWidget {
-  const _DeviceSheetRow({required this.device});
-
-  final IotDeviceState device;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _deviceColor(device.type);
-
-    return InkCard(
-      padding: EdgeInsets.all(11.r),
-      color: device.isActive
-          ? InkPalette.paper.withValues(alpha: 0.72)
-          : InkPalette.paper.withValues(alpha: 0.46),
-      borderColor: color.withValues(alpha: 0.16),
-      child: Row(
-        children: [
-          _DeviceTypeIcon(type: device.type, size: 38),
-          SizedBox(width: 10.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  device.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.text,
-                    fontSize: 13.5.sp,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 3.h),
-                Text(
-                  '${_deviceTypeName(device.type)} · ${device.workingState}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: InkPalette.muted,
-                    fontSize: 11.2.sp,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: 8.w),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                device.telemetryValue,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12.5.sp,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              SizedBox(height: 3.h),
-              Text(
-                '${device.batteryLevel}% · ${device.signalLevel}%',
-                style: TextStyle(
-                  color: InkPalette.muted,
-                  fontSize: 10.5.sp,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 ImageProvider? _avatarProvider(String? avatarUrl) {

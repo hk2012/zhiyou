@@ -5,6 +5,12 @@ import '../core/auth/auth_session.dart';
 import '../features/auth/view/login_screen.dart';
 import '../features/community/view/community_screen.dart';
 import '../features/creation/view/creation_modal_screen.dart';
+import '../features/devices/view/device_alerts_screen.dart';
+import '../features/devices/view/device_binding_screen.dart';
+import '../features/devices/view/device_center_screen.dart';
+import '../features/devices/view/device_command_screen.dart';
+import '../features/devices/view/device_detail_screen.dart';
+import '../features/devices/view/device_scenes_screen.dart';
 import '../features/explore/view/explore_screen.dart';
 import '../features/explore/view/spot_detail_screen.dart';
 import '../features/home/view/home_screen.dart';
@@ -198,6 +204,54 @@ class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) =>
             _inkPage(state, const SettingsScreen()),
+      ),
+      GoRoute(
+        path: AppRouteNames.devices,
+        name: 'Devices',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            _inkPage(state, const DeviceCenterScreen()),
+      ),
+      GoRoute(
+        path: AppRouteNames.deviceAdd,
+        name: 'DeviceAdd',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            _inkPage(state, const DeviceBindingScreen()),
+      ),
+      GoRoute(
+        path: AppRouteNames.deviceDetail,
+        name: 'DeviceDetail',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) => _inkPage(
+          state,
+          DeviceDetailScreen(deviceId: state.pathParameters['deviceId'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        path: AppRouteNames.deviceScenes,
+        name: 'DeviceScenes',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            _inkPage(state, const DeviceScenesScreen()),
+      ),
+      GoRoute(
+        path: AppRouteNames.deviceAlerts,
+        name: 'DeviceAlerts',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            _inkPage(state, const DeviceAlertsScreen()),
+      ),
+      GoRoute(
+        path: AppRouteNames.deviceCommand,
+        name: 'DeviceCommand',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) => _inkPage(
+          state,
+          DeviceCommandScreen(
+            commandId: state.pathParameters['commandId'] ?? '',
+          ),
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

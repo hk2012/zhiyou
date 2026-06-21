@@ -21,17 +21,182 @@ class MainShellScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: InkPageSwitchTransition(
-        triggerKey: navigationShell.currentIndex,
-        child: navigationShell,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = constraints.maxWidth >= 900;
+        final content = InkPageSwitchTransition(
+          triggerKey: navigationShell.currentIndex,
+          child: navigationShell,
+        );
+        if (desktop) {
+          return Scaffold(
+            body: Row(
+              children: [
+                _DesktopNavigation(
+                  currentIndex: navigationShell.currentIndex,
+                  onTap: _goBranch,
+                  onCenterTap: () =>
+                      context.push('${AppRouteNames.creationModal}?entry=nav'),
+                  onDevices: () => context.push(AppRouteNames.devices),
+                ),
+                const VerticalDivider(width: 1, color: InkPalette.line),
+                Expanded(child: content),
+              ],
+            ),
+          );
+        }
+        return Scaffold(
+          extendBody: true,
+          body: content,
+          bottomNavigationBar: _InkBottomNav(
+            currentIndex: navigationShell.currentIndex,
+            onTap: _goBranch,
+            onCenterTap: () =>
+                context.push('${AppRouteNames.creationModal}?entry=nav'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DesktopNavigation extends StatelessWidget {
+  const _DesktopNavigation({
+    required this.currentIndex,
+    required this.onTap,
+    required this.onCenterTap,
+    required this.onDevices,
+  });
+
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final VoidCallback onCenterTap;
+  final VoidCallback onDevices;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 104,
+      color: InkPalette.white.withValues(alpha: 0.96),
+      padding: const EdgeInsets.fromLTRB(10, 18, 10, 16),
+      child: Column(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: InkPalette.pine.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.phishing_rounded,
+              color: InkPalette.pine,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 24),
+          _DesktopNavItem(
+            icon: Icons.auto_awesome_rounded,
+            label: '首页',
+            active: currentIndex == 0,
+            onTap: () => onTap(0),
+          ),
+          _DesktopNavItem(
+            icon: Icons.place_rounded,
+            label: '钓场',
+            active: currentIndex == 1,
+            onTap: () => onTap(1),
+          ),
+          _DesktopNavItem(
+            icon: Icons.devices_other_rounded,
+            label: '设备',
+            active: false,
+            onTap: onDevices,
+          ),
+          _DesktopNavItem(
+            icon: Icons.shopping_bag_rounded,
+            label: '补给',
+            active: currentIndex == 2,
+            onTap: () => onTap(2),
+          ),
+          _DesktopNavItem(
+            icon: Icons.person_rounded,
+            label: '我的',
+            active: currentIndex == 3,
+            onTap: () => onTap(3),
+          ),
+          const Spacer(),
+          Tooltip(
+            message: '开始记录本次作钓',
+            child: FilledButton(
+              onPressed: onCenterTap,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(58, 52),
+                padding: EdgeInsets.zero,
+              ),
+              child: const Icon(Icons.play_arrow_rounded),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '开钓',
+            style: TextStyle(
+              color: InkPalette.muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
-      bottomNavigationBar: _InkBottomNav(
-        currentIndex: navigationShell.currentIndex,
-        onTap: _goBranch,
-        onCenterTap: () =>
-            context.push('${AppRouteNames.creationModal}?entry=nav'),
+    );
+  }
+}
+
+class _DesktopNavItem extends StatelessWidget {
+  const _DesktopNavItem({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? InkPalette.pine : InkPalette.muted;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 58,
+          decoration: BoxDecoration(
+            color: active
+                ? InkPalette.pine.withValues(alpha: 0.10)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

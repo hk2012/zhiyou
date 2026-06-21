@@ -441,10 +441,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           _HomeFunctionAction(
                             icon: Icons.sensors_rounded,
                             title: '设备',
-                            subtitle: '同步',
+                            subtitle: '控制',
                             color: InkPalette.pine,
-                            onTap: () =>
-                                _showDeviceSyncSheet(context, scenario),
+                            onTap: () => context.push(AppRouteNames.devices),
                           ),
                           _HomeFunctionAction(
                             icon: Icons.shopping_bag_rounded,
@@ -511,8 +510,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     InkSectionHeader(
                       title: '设备',
                       subtitle: '只看异常',
-                      action: '同步',
-                      onAction: () => _showDeviceSyncSheet(context, scenario),
+                      action: '管理',
+                      onAction: () => context.push(AppRouteNames.devices),
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 18.w),
@@ -1599,30 +1598,18 @@ class _IotCommandCenter extends ConsumerWidget {
           _IotCompactDeviceStrip(
             devices: devices,
             accent: scenario.accent,
-            onDeviceTap: (device) => _showSingleDeviceSheet(
-              context,
-              scenario,
-              device,
-              onToggle: () {
-                ref.read(iotDevicesProvider.notifier).toggleDevice(device.id);
-                AppFeedback.showMessage(
-                  context,
-                  device.isActive
-                      ? '${device.title} 已切到待机'
-                      : '${device.title} 已启动',
-                );
-              },
-            ),
+            onDeviceTap: (device) =>
+                context.push(AppRouteNames.deviceDetailPath(device.id)),
           ),
           SizedBox(height: 9.h),
           Row(
             children: [
               Expanded(
                 child: InkPrimaryButton(
-                  label: '同步设备',
-                  icon: Icons.sync_rounded,
+                  label: '设备中心',
+                  icon: Icons.devices_other_rounded,
                   color: scenario.accent,
-                  onTap: () => _showDeviceSyncSheet(context, scenario),
+                  onTap: () => context.push(AppRouteNames.devices),
                 ),
               ),
               SizedBox(width: 10.w),
@@ -6621,94 +6608,6 @@ void _showDeviceSheet(
         trailing: '服务',
         color: InkPalette.lake,
         onTap: () => _showDeviceAfterSalesSheet(context, scenario),
-      ),
-    ],
-  );
-}
-
-void _showSingleDeviceSheet(
-  BuildContext context,
-  _FishingMockScenario scenario,
-  IotDeviceState device, {
-  required VoidCallback onToggle,
-}) {
-  final color = _iotDeviceColor(device, scenario.accent);
-  showInkActionSheet(
-    context,
-    title: device.title,
-    subtitle:
-        '${device.sceneRole} · ${device.workingState} · ${device.riskLabel}',
-    icon: _iotDeviceIcon(device.type),
-    color: color,
-    children: [
-      Row(
-        children: [
-          Expanded(
-            child: InkMetric(
-              value: device.telemetryValue,
-              label: device.telemetryLabel,
-              icon: Icons.monitor_heart_rounded,
-              color: color,
-            ),
-          ),
-          SizedBox(width: 8.w),
-          Expanded(
-            child: InkMetric(
-              value: '${device.batteryLevel}%',
-              label: '电量',
-              icon: Icons.battery_charging_full_rounded,
-              color: InkPalette.moss,
-            ),
-          ),
-          SizedBox(width: 8.w),
-          Expanded(
-            child: InkMetric(
-              value: '${device.signalLevel}%',
-              label: '信号',
-              icon: Icons.network_check_rounded,
-              color: InkPalette.lake,
-            ),
-          ),
-        ],
-      ),
-      SizedBox(height: 10.h),
-      InkCard(
-        padding: EdgeInsets.all(11.r),
-        color: InkPalette.paper.withValues(alpha: 0.72),
-        child: InkInfoRow(
-          icon: Icons.tips_and_updates_rounded,
-          title: '设备建议',
-          subtitle: device.actionHint,
-          color: color,
-        ),
-      ),
-    ],
-    actions: [
-      InkSheetAction(
-        icon: Icons.sync_rounded,
-        title: '同步设备数据',
-        subtitle: '刷新设备在线状态、遥测数据和告警',
-        trailing: '同步',
-        color: InkPalette.lake,
-        onTap: () => _showDeviceSyncSheet(context, scenario),
-      ),
-      InkSheetAction(
-        icon: Icons.settings_input_antenna_rounded,
-        title: '设备校准',
-        subtitle: '校准水深、水温和信号阈值',
-        trailing: '校准',
-        color: InkPalette.moss,
-        onTap: () => _showDeviceCalibrationSheet(context, scenario),
-      ),
-      InkSheetAction(
-        icon: device.isActive
-            ? Icons.pause_circle_outline_rounded
-            : Icons.play_circle_outline_rounded,
-        title: device.isActive ? '切到待机' : '启动设备',
-        subtitle: device.isActive ? '暂停实时提醒，保留设备绑定' : '恢复设备在线监测',
-        trailing: '切换',
-        color: color,
-        onTap: onToggle,
       ),
     ],
   );
