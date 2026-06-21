@@ -131,6 +131,10 @@ def test_bind_and_unbind_device(client: TestClient) -> None:
 
 
 def test_scene_creation_and_execution_returns_command_receipts(client: TestClient) -> None:
+    seeded = client.get("/api/v1/device-scenes")
+    assert seeded.status_code == 200
+    assert {item["name"] for item in seeded.json()} >= {"开钓", "夜钓", "收竿"}
+
     created = client.post(
         "/api/v1/device-scenes",
         json={

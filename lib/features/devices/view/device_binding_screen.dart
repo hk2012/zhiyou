@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
@@ -143,11 +144,7 @@ class _DeviceBindingScreenState extends ConsumerState<DeviceBindingScreen> {
           );
       ref.invalidate(deviceCenterProvider);
       if (mounted) {
-        Navigator.popUntil(
-          context,
-          (route) =>
-              route.settings.name == AppRouteNames.devices || route.isFirst,
-        );
+        context.go(AppRouteNames.devices);
       }
     } catch (_) {
       if (mounted) {

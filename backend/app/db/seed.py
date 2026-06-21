@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
+    AutomationSceneRecord,
     AppUser,
     CatchJournalEntry,
     CatchRecord,
@@ -466,6 +467,82 @@ def _seed_smart_devices(db: Session, user: AppUser) -> None:
         firmware.release_notes = notes
         firmware.package_size_mb = size
         firmware.published_at = now
+
+    scene_rows = [
+        {
+            "scene_uid": "scene_departure",
+            "name": "开钓",
+            "description": "开伞并完成钓台调平",
+            "actions": [
+                {
+                    "device_id": "umbrella_sun_01",
+                    "command": "open_umbrella",
+                    "parameters": {},
+                    "confirmed": True,
+                },
+                {
+                    "device_id": "platform_lock_01",
+                    "command": "auto_level",
+                    "parameters": {},
+                    "confirmed": True,
+                },
+            ],
+        },
+        {
+            "scene_uid": "scene_night",
+            "name": "夜钓",
+            "description": "关闭钓箱照明并保留低功耗输出",
+            "actions": [
+                {
+                    "device_id": "box_cool_01",
+                    "command": "set_light",
+                    "parameters": {"enabled": False},
+                    "confirmed": True,
+                }
+            ],
+        },
+        {
+            "scene_uid": "scene_pack",
+            "name": "收竿",
+            "description": "收伞、锁箱并关闭 USB 输出",
+            "actions": [
+                {
+                    "device_id": "umbrella_sun_01",
+                    "command": "close_umbrella",
+                    "parameters": {},
+                    "confirmed": True,
+                },
+                {
+                    "device_id": "box_cool_01",
+                    "command": "set_lock",
+                    "parameters": {"locked": True},
+                    "confirmed": True,
+                },
+                {
+                    "device_id": "box_cool_01",
+                    "command": "set_usb_power",
+                    "parameters": {"enabled": False},
+                    "confirmed": True,
+                },
+            ],
+        },
+    ]
+    for row in scene_rows:
+        scene = db.scalar(
+            select(AutomationSceneRecord).where(
+                AutomationSceneRecord.scene_uid == row["scene_uid"]
+            )
+        )
+        if not scene:
+            scene = AutomationSceneRecord(
+                scene_uid=row["scene_uid"],
+                user_id=user.id,
+                name=row["name"],
+            )
+            db.add(scene)
+        scene.description = row["description"]
+        scene.enabled = True
+        scene.actions = row["actions"]
 
 
 def _seed_explore_module(db: Session) -> None:

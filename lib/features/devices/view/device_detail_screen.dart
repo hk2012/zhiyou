@@ -8,7 +8,6 @@ import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
 import '../application/device_center_controller.dart';
 import '../data/device_center_models.dart';
-import '../data/device_center_repository.dart';
 import 'device_panels/platform_panel.dart';
 import 'device_panels/tackle_box_panel.dart';
 import 'device_panels/umbrella_panel.dart';
@@ -63,16 +62,13 @@ class DeviceDetailScreen extends ConsumerWidget {
           final confirmed = await _confirmFirmware(context);
           if (!confirmed) return;
           final receipt = await ref
-              .read(deviceCenterRepositoryProvider)
-              .startFirmwareUpgrade(deviceId, confirmed: true);
-          ref
               .read(deviceControlProvider(deviceId).notifier)
               .issue(
                 'firmware_upgrade',
                 parameters: {'target_version': bundle.firmware.latestVersion},
                 confirmed: true,
               );
-          if (context.mounted) {
+          if (receipt != null && context.mounted) {
             context.push(AppRouteNames.deviceCommandPath(receipt.commandId));
           }
         },

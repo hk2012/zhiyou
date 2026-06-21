@@ -25,46 +25,23 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      background:
-        radial-gradient(circle at 28% 18%, rgba(20, 184, 166, 0.14), transparent 30%),
-        radial-gradient(circle at 74% 20%, rgba(37, 99, 235, 0.12), transparent 32%),
-        #0f172a;
+      background: #f4f8f7;
       overflow: hidden;
     }
     #flutter-host {
       position: fixed !important;
-      left: 50% !important;
-      top: 50% !important;
-      width: min(390px, 100vw) !important;
-      height: min(844px, calc(100dvh - 40px)) !important;
-      transform: translate(-50%, -50%) !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100dvh !important;
       overflow: hidden !important;
-      border-radius: 24px;
-      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.36);
-      background: #f6f8fb;
+      background: #f4f8f7;
     }
     #flutter-host flutter-view,
     #flutter-host flt-glass-pane {
       width: 100% !important;
       height: 100% !important;
-      border-radius: inherit;
       overflow: hidden !important;
       pointer-events: all !important;
-    }
-    @media (max-width: 559px) {
-      html, body {
-        background-color: #f6f8fb;
-        background-image: none;
-      }
-      #flutter-host {
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        height: 100dvh !important;
-        transform: none !important;
-        border-radius: 0;
-        box-shadow: none;
-      }
     }
     #loading {
       position: fixed;
