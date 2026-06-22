@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/layout/app_breakpoints.dart';
+import '../../../core/localization/app_localizations_x.dart';
+import '../../../core/localization/locale_controller.dart';
+import '../../../core/localization/locale_preferences.dart';
 import '../../../features/auth/data/auth_repository.dart';
 import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/app_feedback.dart';
@@ -23,6 +27,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final localePreference = ref.watch(appLocaleProvider);
     return InkPage(
       child: ListView(
         physics: const BouncingScrollPhysics(),
@@ -34,8 +40,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
         children: [
           InkTopBar(
-            title: '设置',
-            subtitle: '账号、隐私、主题和设备偏好',
+            title: l10n.settingsTitle,
+            subtitle: l10n.settingsSubtitle,
             onBack: () => context.pop(),
           ),
           Padding(
@@ -119,7 +125,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
-          const InkSectionHeader(title: '通用', subtitle: '缓存、语言、字体和设备数据'),
+          InkSectionHeader(
+            title: l10n.settingsGeneral,
+            subtitle: l10n.settingsGeneralSubtitle,
+          ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 18.w),
             child: Column(
@@ -136,10 +145,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _menuTile(
                   icon: Icons.language_rounded,
                   color: InkPalette.lake,
-                  title: '语言',
-                  subtitle: '简体中文，兼容跨区域钓旅内容',
-                  trailing: '简体中文',
-                  onTap: () => _comingSoon('语言设置'),
+                  title: l10n.settingsLanguage,
+                  subtitle: l10n.settingsLanguageSubtitle,
+                  trailing: _localePreferenceLabel(localePreference, context),
+                  onTap: _showLanguagePicker,
                 ),
                 SizedBox(height: 10.h),
                 _menuTile(
@@ -332,6 +341,55 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _showSettingsPanel(feature);
   }
 
+  String _localePreferenceLabel(
+    AppLocalePreference preference,
+    BuildContext context,
+  ) {
+    final l10n = context.l10n;
+    return switch (preference) {
+      AppLocalePreference.system => l10n.languageSystem,
+      AppLocalePreference.chinese => l10n.languageChinese,
+      AppLocalePreference.english => l10n.languageEnglish,
+      AppLocalePreference.korean => l10n.languageKorean,
+    };
+  }
+
+  Future<void> _showLanguagePicker() async {
+    final selected = ref.read(appLocaleProvider);
+    final picker = _LanguagePicker(
+      selected: selected,
+      onSelected: (preference) => Navigator.pop(context, preference),
+    );
+    final AppLocalePreference? result;
+    if (AppBreakpoint.fromWidth(MediaQuery.sizeOf(context).width) ==
+        AppBreakpoint.compact) {
+      result = await showModalBottomSheet<AppLocalePreference>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            child: picker,
+          ),
+        ),
+      );
+    } else {
+      result = await showDialog<AppLocalePreference>(
+        context: context,
+        builder: (context) => AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+          content: SizedBox(width: 440, child: picker),
+        ),
+      );
+    }
+    if (result == null || result == selected) return;
+    await ref.read(appLocaleProvider.notifier).select(result);
+    if (mounted) {
+      AppFeedback.showMessage(context, context.l10n.languageSelectionSaved);
+    }
+  }
+
   void _showSettingsPanel(String feature) {
     final rows = _settingRowsFor(feature);
     final spec = _settingPanelSpecFor(feature);
@@ -397,6 +455,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ref.invalidate(currentUserProvider);
     ref.invalidate(userStatsProvider);
     if (context.mounted) context.go(AppRouteNames.login);
+  }
+}
+
+class _LanguagePicker extends StatelessWidget {
+  const _LanguagePicker({required this.selected, required this.onSelected});
+
+  final AppLocalePreference selected;
+  final ValueChanged<AppLocalePreference> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final options = <(AppLocalePreference, String, String)>[
+      (
+        AppLocalePreference.system,
+        l10n.languageSystem,
+        l10n.languageSystemDescription,
+      ),
+      (
+        AppLocalePreference.chinese,
+        l10n.languageChinese,
+        l10n.localeChineseName,
+      ),
+      (
+        AppLocalePreference.english,
+        l10n.languageEnglish,
+        l10n.localeEnglishName,
+      ),
+      (AppLocalePreference.korean, l10n.languageKorean, l10n.localeKoreanName),
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.languageAndRegion,
+          style: const TextStyle(
+            color: InkPalette.text,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (final option in options)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              option.$2,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            subtitle: Text(option.$3),
+            trailing: Icon(
+              selected == option.$1
+                  ? Icons.check_circle_rounded
+                  : Icons.circle_outlined,
+              color: selected == option.$1 ? InkPalette.pine : InkPalette.faint,
+            ),
+            onTap: () => onSelected(option.$1),
+          ),
+      ],
+    );
   }
 }
 

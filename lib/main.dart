@@ -1,16 +1,23 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'core/auth/auth_session.dart';
-import 'core/theme/app_theme.dart';
+import 'core/localization/app_localizations_x.dart';
+import 'core/localization/locale_controller.dart';
+import 'core/localization/locale_preferences.dart';
 import 'core/network/dio_client.dart';
+import 'core/theme/app_theme.dart';
+import 'l10n/generated/app_localizations.dart';
 import 'routes/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AuthSession.init();
+  await AppLocaleStore.init();
   DioClient.init();
 
   // Edge-to-Edge：让 Flutter 渲染延伸到状态栏和导航栏区域
@@ -40,13 +47,18 @@ class MyApp extends ConsumerWidget {
   }
 }
 
-class _BrowserAdaptiveApp extends StatelessWidget {
+class _BrowserAdaptiveApp extends ConsumerWidget {
   const _BrowserAdaptiveApp({required this.designSize});
 
   final Size designSize;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localePreference = ref.watch(appLocaleProvider);
+    final activeLocale = resolveSupportedLocale(
+      PlatformDispatcher.instance.locale,
+      preference: localePreference,
+    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewportWidth = constraints.maxWidth.isFinite
@@ -81,10 +93,18 @@ class _BrowserAdaptiveApp extends StatelessWidget {
         final framedApp = MediaQuery(
           data: frameMediaQuery,
           child: MaterialApp.router(
-            title: '江湖钓客',
+            onGenerateTitle: (context) => context.l10n.appName,
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            theme: AppTheme.lightThemeFor(activeLocale),
+            darkTheme: AppTheme.darkThemeFor(activeLocale),
+            locale: localePreference.locale,
+            supportedLocales: supportedAppLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localeResolutionCallback: (locale, supportedLocales) =>
+                resolveSupportedLocale(
+                  locale ?? const Locale('zh'),
+                  preference: localePreference,
+                ),
             routerConfig: AppRouter.router,
             builder: (context, child) {
               return MediaQuery(

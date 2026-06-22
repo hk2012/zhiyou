@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.localization import resolve_content_language
 
 
 def create_app() -> FastAPI:
@@ -42,6 +43,10 @@ def create_app() -> FastAPI:
         """为每个请求补请求 ID、耗时统计和最近请求记录。"""
         started = time.perf_counter()
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        content_language = resolve_content_language(
+            request.headers.get("Accept-Language")
+        )
+        request.state.content_language = content_language
         status_code = 500
         try:
             response = await call_next(request)
@@ -55,6 +60,7 @@ def create_app() -> FastAPI:
         _record_request_metric(request, request_id, status_code, duration_ms)
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Process-Time-Ms"] = f"{duration_ms:.2f}"
+        response.headers["Content-Language"] = content_language
         return response
 
     app.include_router(api_router, prefix=settings.api_prefix)

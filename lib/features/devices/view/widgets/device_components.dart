@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/domain/app_domain_models.dart';
+import '../../../../core/localization/app_localizations_x.dart';
 import '../../../../shared/widgets/ink_app_widgets.dart';
 import '../../../home/data/device_models.dart';
 import '../../application/device_center_controller.dart';
@@ -75,7 +76,9 @@ class DeviceHeader extends StatelessWidget {
                       icon: device.isOnline
                           ? Icons.circle
                           : Icons.pause_circle_rounded,
-                      label: device.isOnline ? '在线' : '待机',
+                      label: device.isOnline
+                          ? context.l10n.deviceOnline
+                          : context.l10n.deviceStandby,
                       color: device.isOnline
                           ? InkPalette.pine
                           : InkPalette.faint,
@@ -89,7 +92,9 @@ class DeviceHeader extends StatelessWidget {
                     ),
                     DeviceStatusPill(
                       icon: Icons.network_cell_rounded,
-                      label: device.signalLevel >= 70 ? '信号强' : '信号弱',
+                      label: device.signalLevel >= 70
+                          ? context.l10n.deviceStrongSignal
+                          : context.l10n.deviceWeakSignal,
                       color: device.signalLevel >= 70
                           ? InkPalette.pine
                           : InkPalette.reed,
@@ -98,7 +103,9 @@ class DeviceHeader extends StatelessWidget {
                       icon: source == 'api'
                           ? Icons.cloud_done_rounded
                           : Icons.science_rounded,
-                      label: source == 'api' ? '实时 API' : '本地演示',
+                      label: source == 'api'
+                          ? context.l10n.deviceRealtimeApi
+                          : context.l10n.deviceLocalDemo,
                       color: source == 'api'
                           ? InkPalette.lake
                           : InkPalette.reed,
@@ -166,11 +173,12 @@ class DeviceTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = {
-      DeviceDetailTab.status: '状态',
-      DeviceDetailTab.control: '控制',
-      DeviceDetailTab.automation: '自动化',
-      DeviceDetailTab.maintenance: '维护',
+    final l10n = context.l10n;
+    final labels = {
+      DeviceDetailTab.status: l10n.deviceTabStatus,
+      DeviceDetailTab.control: l10n.deviceTabControl,
+      DeviceDetailTab.automation: l10n.deviceTabAutomation,
+      DeviceDetailTab.maintenance: l10n.deviceTabMaintenance,
     };
     return Container(
       padding: const EdgeInsets.all(4),

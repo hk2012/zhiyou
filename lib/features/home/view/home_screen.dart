@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/layout/app_breakpoints.dart';
+import '../../../core/localization/app_localizations_x.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../routes/app_route_names.dart';
@@ -333,6 +336,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final scenario = _scenario;
     final devices = ref.watch(iotDevicesProvider);
+    final l10n = context.l10n;
 
     return InkPage(
       child: RefreshIndicator(
@@ -399,9 +403,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     InkSectionHeader(
-                      title: '功能',
-                      subtitle: '常用入口',
-                      action: '全部',
+                      title: l10n.homeFunctions,
+                      subtitle: l10n.homeCommonEntries,
+                      action: l10n.actionAll,
                       onAction: () => _showHomeMoreSheet(
                         context,
                         scenario,
@@ -416,8 +420,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         actions: [
                           _HomeFunctionAction(
                             icon: Icons.place_rounded,
-                            title: '找钓点',
-                            subtitle: '路线 / 预约',
+                            title: l10n.homeFindSpot,
+                            subtitle: l10n.homeRouteBooking,
                             color: InkPalette.lake,
                             onTap: () => context.go(
                               _exploreRoute(scenario, intent: 'spot'),
@@ -425,37 +429,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                           _HomeFunctionAction(
                             icon: Icons.play_arrow_rounded,
-                            title: '开钓',
-                            subtitle: '现场模式',
+                            title: l10n.homeStartFishing,
+                            subtitle: l10n.homeFieldMode,
                             color: scenario.accent,
                             onTap: () =>
                                 _showStartFishingSheet(context, scenario),
                           ),
                           _HomeFunctionAction(
                             icon: Icons.inventory_2_rounded,
-                            title: '装备',
-                            subtitle: '清单',
+                            title: l10n.homeGear,
+                            subtitle: l10n.homeChecklist,
                             color: InkPalette.reed,
                             onTap: () => _showGearSheet(context, scenario),
                           ),
                           _HomeFunctionAction(
                             icon: Icons.sensors_rounded,
-                            title: '设备',
-                            subtitle: '控制',
+                            title: l10n.homeDevices,
+                            subtitle: l10n.homeControl,
                             color: InkPalette.pine,
                             onTap: () => context.push(AppRouteNames.devices),
                           ),
                           _HomeFunctionAction(
                             icon: Icons.shopping_bag_rounded,
-                            title: '补给',
-                            subtitle: '按场景',
+                            title: l10n.homeSupplies,
+                            subtitle: l10n.homeByScene,
                             color: InkPalette.moss,
                             onTap: () => context.go(AppRouteNames.mall),
                           ),
                           _HomeFunctionAction(
                             icon: Icons.set_meal_rounded,
-                            title: '记录',
-                            subtitle: '鱼获',
+                            title: l10n.homeRecord,
+                            subtitle: l10n.homeCatch,
                             color: InkPalette.lake,
                             onTap: () => context.push(_creationRoute(scenario)),
                           ),
@@ -867,8 +871,15 @@ class _HomeFunctionDock extends StatelessWidget {
       padding: EdgeInsets.all(10.r),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 560;
-          final columns = narrow ? 2 : 3;
+          final width = constraints.maxWidth;
+          final columns = AppResponsiveSpec.homeActionColumns(width);
+          final breakpoint = AppBreakpoint.fromWidth(width);
+          final tileHeight = switch (breakpoint) {
+            AppBreakpoint.compact => 106.0,
+            AppBreakpoint.medium => 104.0,
+            AppBreakpoint.expanded => 96.0,
+            AppBreakpoint.wide => 92.0,
+          };
           return GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -877,17 +888,19 @@ class _HomeFunctionDock extends StatelessWidget {
               crossAxisCount: columns,
               mainAxisSpacing: 8.h,
               crossAxisSpacing: 8.w,
-              childAspectRatio: narrow ? 1.34 : 1.78,
+              mainAxisExtent: tileHeight,
             ),
             itemBuilder: (context, index) {
               final action = actions[index];
-              return InkEntrance(
-                delay: Duration(milliseconds: 35 * index),
-                offset: 8,
-                child: _HomeFunctionTile(
-                  action: action,
-                  isPrimary: index == 1,
-                  accent: accent,
+              return SizedBox.expand(
+                child: InkEntrance(
+                  delay: Duration(milliseconds: 35 * index),
+                  offset: 8,
+                  child: _HomeFunctionTile(
+                    action: action,
+                    isPrimary: index == 1,
+                    accent: accent,
+                  ),
                 ),
               );
             },
@@ -913,57 +926,58 @@ class _HomeFunctionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkPressable(
       onTap: action.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        constraints: BoxConstraints(minHeight: 70.h),
-        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
-        decoration: BoxDecoration(
-          color: isPrimary
-              ? accent.withValues(alpha: 0.14)
-              : action.color.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(
+      child: SizedBox.expand(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+          decoration: BoxDecoration(
             color: isPrimary
-                ? accent.withValues(alpha: 0.22)
-                : action.color.withValues(alpha: 0.12),
+                ? accent.withValues(alpha: 0.14)
+                : action.color.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(
+              color: isPrimary
+                  ? accent.withValues(alpha: 0.22)
+                  : action.color.withValues(alpha: 0.12),
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 24.w,
-              height: 24.w,
-              decoration: BoxDecoration(
-                color: action.color.withValues(alpha: 0.13),
-                shape: BoxShape.circle,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 28.w.clamp(28, 34),
+                height: 28.w.clamp(28, 34),
+                decoration: BoxDecoration(
+                  color: action.color.withValues(alpha: 0.13),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(action.icon, color: action.color, size: 17),
               ),
-              child: Icon(action.icon, color: action.color, size: 15.w),
-            ),
-            const Spacer(),
-            Text(
-              action.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: InkPalette.text,
-                fontSize: 12.2.sp,
-                fontWeight: FontWeight.w900,
+              const Spacer(),
+              Text(
+                action.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: InkPalette.text,
+                  fontSize: 13.sp.clamp(13, 15),
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
-            SizedBox(height: 2.h),
-            Text(
-              action.subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: InkPalette.muted,
-                fontSize: 9.8.sp,
-                fontWeight: FontWeight.w800,
+              SizedBox(height: 3.h),
+              Text(
+                action.subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: InkPalette.muted,
+                  fontSize: 10.5.sp.clamp(10.5, 12),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

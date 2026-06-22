@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/app_localizations_x.dart';
 import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
@@ -246,7 +247,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               InkTopBar(
-                title: '选钓点',
+                title: context.l10n.exploreTitle,
                 subtitle:
                     '${venueSummary.location} · ${venueSummary.updatedAt}',
                 leading: Container(

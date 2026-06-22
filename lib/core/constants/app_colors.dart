@@ -188,6 +188,7 @@ class AppTypography {
   AppTypography._();
 
   static const List<String> fontFallback = [
+    'NotoSansKR',
     'PingFang SC',
     'Hiragino Sans GB',
     'Microsoft YaHei',

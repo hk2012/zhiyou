@@ -5,10 +5,14 @@ import '../constants/app_colors.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get lightTheme {
+  static ThemeData get lightTheme => lightThemeFor(const Locale('zh'));
+
+  static ThemeData lightThemeFor(Locale locale) {
+    final fontFamily = locale.languageCode == 'ko' ? 'NotoSansKR' : null;
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      fontFamily: fontFamily,
       fontFamilyFallback: AppTypography.fontFallback,
       scaffoldBackgroundColor: AppColors.surface,
       colorScheme: const ColorScheme.light(
@@ -39,7 +43,9 @@ class AppTheme {
 
     return base.copyWith(
       primaryColor: AppColors.brand,
-      textTheme: AppTypography.textTheme,
+      textTheme: fontFamily == null
+          ? AppTypography.textTheme
+          : AppTypography.textTheme.apply(fontFamily: fontFamily),
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
@@ -297,4 +303,6 @@ class AppTheme {
   }
 
   static ThemeData get darkTheme => lightTheme;
+
+  static ThemeData darkThemeFor(Locale locale) => lightThemeFor(locale);
 }

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../auth/auth_session.dart';
+import '../localization/locale_controller.dart';
 import 'api_environment.dart';
 import 'api_exception.dart';
 
@@ -26,6 +27,12 @@ class DioClient {
             options.headers['Authorization'] = 'Bearer $token';
           }
           options.headers['X-Client-Api-Env'] = ApiEnvironment.profileLabel;
+          final locale = AppLocaleStore.effectiveLocale;
+          options.headers['Accept-Language'] = switch (locale.languageCode) {
+            'en' => 'en-US',
+            'ko' => 'ko-KR',
+            _ => 'zh-CN',
+          };
           return handler.next(options);
         },
         onResponse: (response, handler) {

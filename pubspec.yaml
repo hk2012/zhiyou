@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -44,6 +46,7 @@ dependencies:
   permission_handler: ^12.0.3
   image_picker: ^1.2.2
   url_launcher: ^6.3.2
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +64,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -71,6 +75,12 @@ flutter:
     - assets/images/ink_style/home_lake_hero.png
     - assets/images/ink_style/ink_fishing_map.png
     - assets/images/app_visuals/commercial_tiles.png
+    - assets/fonts/NotoSansKR-OFL.txt
+
+  fonts:
+    - family: NotoSansKR
+      fonts:
+        - asset: assets/fonts/NotoSansKR-Variable.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

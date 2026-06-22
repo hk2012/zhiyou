@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/app_localizations_x.dart';
 import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
@@ -17,16 +18,16 @@ class DeviceCenterScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(deviceCenterProvider);
     return state.when(
-      loading: () => const DevicePageShell(
-        title: '设备中心',
+      loading: () => DevicePageShell(
+        title: context.l10n.deviceCenter,
         child: Center(child: CircularProgressIndicator()),
       ),
       error: (error, stackTrace) => DevicePageShell(
-        title: '设备中心',
+        title: context.l10n.deviceCenter,
         child: AppErrorView(
-          title: '设备加载失败',
+          title: context.l10n.deviceLoadFailed,
           message: error.toString(),
-          actionLabel: '重试',
+          actionLabel: context.l10n.actionRetry,
           onAction: () => ref.invalidate(deviceCenterProvider),
         ),
       ),
@@ -75,11 +76,11 @@ class DeviceCenterBody extends StatelessWidget {
         .where((item) => item.alerts.isNotEmpty || item.isLowBattery)
         .length;
     return DevicePageShell(
-      title: '设备中心',
+      title: context.l10n.deviceCenter,
       showBack: true,
       actions: [
         IconButton(
-          tooltip: '新增设备',
+          tooltip: context.l10n.actionAddDevice,
           onPressed: onAddDevice,
           icon: const Icon(Icons.add_circle_outline_rounded),
         ),
@@ -166,13 +167,15 @@ class _OverviewPane extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const DeviceSectionTitle(
+              DeviceSectionTitle(
                 icon: Icons.health_and_safety_rounded,
-                title: '设备健康',
+                title: context.l10n.deviceHealth,
               ),
               const SizedBox(height: 14),
               Text(
-                warning == 0 ? '运行稳定' : '$warning 项待处理',
+                warning == 0
+                    ? context.l10n.deviceStable
+                    : context.l10n.devicePending(warning),
                 style: TextStyle(
                   color: warning == 0 ? InkPalette.pine : InkPalette.reed,
                   fontSize: 28,
@@ -203,7 +206,7 @@ class _OverviewPane extends StatelessWidget {
             children: [
               ListTile(
                 leading: const Icon(Icons.auto_awesome_rounded),
-                title: const Text('场景联动'),
+                title: Text(context.l10n.deviceScenes),
                 subtitle: const Text('开钓 · 夜钓 · 收竿'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: onScenes,
@@ -255,10 +258,10 @@ class _DeviceListPane extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  '全部设备',
-                  style: TextStyle(
+                  context.l10n.deviceAll,
+                  style: const TextStyle(
                     color: InkPalette.text,
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -278,17 +281,17 @@ class _DeviceListPane extends StatelessWidget {
             runSpacing: 8,
             children: [
               ChoiceChip(
-                label: const Text('全部设备'),
+                label: Text(context.l10n.deviceAll),
                 selected: state.filter == 'all',
                 onSelected: (_) => onFilter?.call('all'),
               ),
               ChoiceChip(
-                label: const Text('在线'),
+                label: Text(context.l10n.deviceOnline),
                 selected: state.filter == 'online',
                 onSelected: (_) => onFilter?.call('online'),
               ),
               ChoiceChip(
-                label: const Text('只看异常'),
+                label: Text(context.l10n.deviceAlertsOnly),
                 selected: state.filter == 'alerts',
                 onSelected: (_) => onFilter?.call('alerts'),
               ),

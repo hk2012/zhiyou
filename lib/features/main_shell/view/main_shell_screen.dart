@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/layout/app_breakpoints.dart';
+import '../../../core/localization/app_localizations_x.dart';
 import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
 
@@ -23,16 +25,18 @@ class MainShellScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final desktop = constraints.maxWidth >= 900;
+        final width = constraints.maxWidth;
+        final breakpoint = AppBreakpoint.fromWidth(width);
         final content = InkPageSwitchTransition(
           triggerKey: navigationShell.currentIndex,
           child: navigationShell,
         );
-        if (desktop) {
+        if (breakpoint != AppBreakpoint.compact) {
           return Scaffold(
             body: Row(
               children: [
                 _DesktopNavigation(
+                  compact: breakpoint == AppBreakpoint.medium,
                   currentIndex: navigationShell.currentIndex,
                   onTap: _goBranch,
                   onCenterTap: () =>
@@ -62,12 +66,14 @@ class MainShellScreen extends StatelessWidget {
 
 class _DesktopNavigation extends StatelessWidget {
   const _DesktopNavigation({
+    required this.compact,
     required this.currentIndex,
     required this.onTap,
     required this.onCenterTap,
     required this.onDevices,
   });
 
+  final bool compact;
   final int currentIndex;
   final ValueChanged<int> onTap;
   final VoidCallback onCenterTap;
@@ -75,10 +81,11 @@ class _DesktopNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
-      width: 104,
+      width: compact ? 78 : 104,
       color: InkPalette.white.withValues(alpha: 0.96),
-      padding: const EdgeInsets.fromLTRB(10, 18, 10, 16),
+      padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 18, compact ? 8 : 10, 16),
       child: Column(
         children: [
           Container(
@@ -96,38 +103,43 @@ class _DesktopNavigation extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _DesktopNavItem(
+            compact: compact,
             icon: Icons.auto_awesome_rounded,
-            label: '首页',
+            label: l10n.navHome,
             active: currentIndex == 0,
             onTap: () => onTap(0),
           ),
           _DesktopNavItem(
+            compact: compact,
             icon: Icons.place_rounded,
-            label: '钓场',
+            label: l10n.navExplore,
             active: currentIndex == 1,
             onTap: () => onTap(1),
           ),
           _DesktopNavItem(
+            compact: compact,
             icon: Icons.devices_other_rounded,
-            label: '设备',
+            label: l10n.navDevices,
             active: false,
             onTap: onDevices,
           ),
           _DesktopNavItem(
+            compact: compact,
             icon: Icons.shopping_bag_rounded,
-            label: '补给',
+            label: l10n.navMall,
             active: currentIndex == 2,
             onTap: () => onTap(2),
           ),
           _DesktopNavItem(
+            compact: compact,
             icon: Icons.person_rounded,
-            label: '我的',
+            label: l10n.navProfile,
             active: currentIndex == 3,
             onTap: () => onTap(3),
           ),
           const Spacer(),
           Tooltip(
-            message: '开始记录本次作钓',
+            message: l10n.tooltipStartFishing,
             child: FilledButton(
               onPressed: onCenterTap,
               style: FilledButton.styleFrom(
@@ -138,14 +150,15 @@ class _DesktopNavigation extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            '开钓',
-            style: TextStyle(
-              color: InkPalette.muted,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
+          if (!compact)
+            Text(
+              l10n.navStartFishing,
+              style: const TextStyle(
+                color: InkPalette.muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -154,12 +167,14 @@ class _DesktopNavigation extends StatelessWidget {
 
 class _DesktopNavItem extends StatelessWidget {
   const _DesktopNavItem({
+    required this.compact,
     required this.icon,
     required this.label,
     required this.active,
     required this.onTap,
   });
 
+  final bool compact;
   final IconData icon;
   final String label;
   final bool active;
@@ -185,15 +200,17 @@ class _DesktopNavItem extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: color, size: 22),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+              if (!compact) ...[
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -215,6 +232,7 @@ class _InkBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final safeBottom = MediaQuery.of(context).viewPadding.bottom;
     return Container(
       margin: EdgeInsets.fromLTRB(
@@ -247,14 +265,14 @@ class _InkBottomNav extends StatelessWidget {
                 _NavItem(
                   icon: Icons.auto_awesome_outlined,
                   activeIcon: Icons.auto_awesome_rounded,
-                  label: '首页',
+                  label: l10n.navHome,
                   active: currentIndex == 0,
                   onTap: () => onTap(0),
                 ),
                 _NavItem(
                   icon: Icons.place_outlined,
                   activeIcon: Icons.place_rounded,
-                  label: '钓场',
+                  label: l10n.navExplore,
                   active: currentIndex == 1,
                   onTap: () => onTap(1),
                 ),
@@ -295,7 +313,7 @@ class _InkBottomNav extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '开钓',
+                          l10n.navStartFishing,
                           maxLines: 1,
                           style: TextStyle(
                             color: InkPalette.ink,
@@ -311,14 +329,14 @@ class _InkBottomNav extends StatelessWidget {
                 _NavItem(
                   icon: Icons.shopping_bag_outlined,
                   activeIcon: Icons.shopping_bag_rounded,
-                  label: '补给',
+                  label: l10n.navMall,
                   active: currentIndex == 2,
                   onTap: () => onTap(2),
                 ),
                 _NavItem(
                   icon: Icons.person_outline_rounded,
                   activeIcon: Icons.person_rounded,
-                  label: '我的',
+                  label: l10n.navProfile,
                   active: currentIndex == 3,
                   onTap: () => onTap(3),
                 ),

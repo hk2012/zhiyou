@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/app_localizations_x.dart';
 import '../../../routes/app_route_names.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/ink_app_widgets.dart';
@@ -335,8 +336,8 @@ class _MallScreenState extends State<MallScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             InkTopBar(
-              title: '出钓补给',
-              subtitle: '先看今天缺什么',
+              title: context.l10n.mallTitle,
+              subtitle: context.l10n.mallSubtitle,
               onBack: () => context.pop(),
               actions: [
                 InkRoundButton(

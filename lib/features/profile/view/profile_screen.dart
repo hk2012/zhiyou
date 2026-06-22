@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_session.dart';
 import '../../../core/domain/app_domain_models.dart';
+import '../../../core/localization/app_localizations_x.dart';
 import '../../../features/auth/data/auth_repository.dart';
 import '../../../features/home/providers/iot_device_provider.dart';
 import '../../../routes/app_route_names.dart';
@@ -60,7 +61,10 @@ class ProfileScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const InkTopBar(title: '我的', subtitle: '用户资产 · 智能装备 · 订单服务'),
+            InkTopBar(
+              title: context.l10n.profileTitle,
+              subtitle: context.l10n.profileSubtitle,
+            ),
             if (!isLoggedIn)
               _ProfileContentPadding(
                 motionIndex: 0,

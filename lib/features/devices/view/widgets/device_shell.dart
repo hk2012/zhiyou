@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/layout/app_breakpoints.dart';
+import '../../../../core/localization/app_localizations_x.dart';
 import '../../../../shared/widgets/ink_app_widgets.dart';
 
 enum DeviceResponsiveMode {
@@ -8,9 +10,12 @@ enum DeviceResponsiveMode {
   desktop;
 
   static DeviceResponsiveMode fromWidth(double width) {
-    if (width >= 1100) return DeviceResponsiveMode.desktop;
-    if (width >= 700) return DeviceResponsiveMode.tablet;
-    return DeviceResponsiveMode.phone;
+    return switch (AppBreakpoint.fromWidth(width)) {
+      AppBreakpoint.compact => DeviceResponsiveMode.phone,
+      AppBreakpoint.medium => DeviceResponsiveMode.tablet,
+      AppBreakpoint.expanded ||
+      AppBreakpoint.wide => DeviceResponsiveMode.desktop,
+    };
   }
 }
 
@@ -105,7 +110,7 @@ class _DeviceAppBar extends StatelessWidget {
           const SizedBox(width: 8),
           if (showBack)
             IconButton(
-              tooltip: '返回',
+              tooltip: context.l10n.actionBack,
               onPressed: () => Navigator.maybePop(context),
               icon: const Icon(Icons.arrow_back_ios_new_rounded),
             )

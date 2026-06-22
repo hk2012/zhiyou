@@ -6,6 +6,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/layout/app_breakpoints.dart';
+import '../../core/localization/app_localizations_x.dart';
 
 class InkPalette {
   InkPalette._();
@@ -59,7 +61,7 @@ class InkBrand extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '江湖钓客',
+          context.l10n.appName,
           style: TextStyle(
             color: color,
             fontSize: titleSize,
@@ -80,7 +82,7 @@ class InkBrand extends StatelessWidget {
             ),
             SizedBox(width: 5.w),
             Text(
-              '智能设备',
+              context.l10n.brandSmartDevices,
               style: TextStyle(
                 color: subtitleColor,
                 fontSize: compact ? 10.5.sp : 12.sp,
@@ -98,7 +100,7 @@ class InkBrand extends StatelessWidget {
               ),
             ),
             Text(
-              'AI 出钓决策',
+              context.l10n.brandAiDecision,
               style: TextStyle(
                 color: subtitleColor,
                 fontSize: compact ? 10.5.sp : 12.sp,
@@ -135,7 +137,24 @@ class InkPage extends StatelessWidget {
       body: Stack(
         children: [
           const Positioned.fill(child: InkBackdrop()),
-          SafeArea(top: !extendBehindStatusBar, bottom: false, child: child),
+          SafeArea(
+            top: !extendBehindStatusBar,
+            bottom: false,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final maxWidth = AppResponsiveSpec.contentMaxWidth(
+                  constraints.maxWidth,
+                );
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxWidth),
+                    child: child,
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

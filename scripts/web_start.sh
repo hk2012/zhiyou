@@ -46,6 +46,12 @@ install_browser_probe_files() {
   if [[ -f "$PROJECT_ROOT/web/flutter.js.map" ]]; then
     cp "$PROJECT_ROOT/web/flutter.js.map" "$build_dir/flutter.js.map"
   fi
+  if [[ -d "$PROJECT_ROOT/web/flutter-font-fallback" ]]; then
+    mkdir -p "$build_dir/flutter-font-fallback"
+    rsync -a \
+      "$PROJECT_ROOT/web/flutter-font-fallback/" \
+      "$build_dir/flutter-font-fallback/"
+  fi
 }
 
 echo "==> 后台重启 Web 服务，端口: $WEB_PORT"
